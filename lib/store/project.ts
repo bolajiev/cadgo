@@ -283,6 +283,7 @@ export const useProject = create<ProjectState & ProjectActions>((set, get) => ({
       plate: false,
       error: null,
     });
+    window.setTimeout(() => get().refreshRecents(), 150);
   },
 
   compile: async (spec, options = {}) => {
