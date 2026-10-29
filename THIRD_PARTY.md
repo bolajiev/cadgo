@@ -11,7 +11,7 @@ Cadgo is MIT licensed. It builds on the following projects:
 | [Next.js](https://nextjs.org) | MIT | application framework |
 | [Zustand](https://github.com/pmndrs/zustand) | MIT | state |
 | [Zod](https://zod.dev) | MIT | schema validation |
-| [jsonrepair](https://github.com/josdejong/jsonrepair) | MIT | tolerant JSON parsing |
+| [jsonrepair](https://github.com/josdejong/jsonrepair) | ISC | tolerant JSON parsing |
 | [lz-string](https://github.com/pieroxy/lz-string) | MIT | share-link compression |
 | [idb-keyval](https://github.com/jakearchibald/idb-keyval) | Apache-2.0 | local recent projects |
 | [Anatomy](https://github.com/wheresryan22/anatomy) | MIT | drafting/plate design language |
