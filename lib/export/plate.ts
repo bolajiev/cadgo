@@ -74,7 +74,7 @@ export function downloadPlate(
     ctx.strokeRect(boxX, boxY, boxW, boxH);
     const rows: [string, string][] = [
       ["TYPE", "CADGO / ASSEMBLY PLATE"],
-      ["SCALE", "1:2"],
+      ["SCALE", "NTS"],
       ["PARTS", `${parts}`],
       ["MASS", formatMass(mass)],
       ["VOLUME", formatVolume(volume)],

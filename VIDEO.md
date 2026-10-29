@@ -40,7 +40,7 @@ Target length: **2:45**. Record at 1440×900 or 1920×1080, browser zoom 100%. U
 **2:35–2:45 — Close**
 - Return to the landing title.
 - Voice: “Cadgo. Say it, shape it, set it in motion.”
-- On-screen: repo URL, live demo URL, “Victoria VR AI Builder Hackathon 2026”.
+- On-screen: https://github.com/bolajiev/cadgo · https://cadgo.vercel.app · “Victoria VR AI Builder Hackathon 2026”.
 
 ## Prep checklist
 

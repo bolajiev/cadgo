@@ -812,7 +812,7 @@ export const useProject = create<ProjectState & ProjectActions>((set, get) => ({
         child: {
           op: "cylinder" as const,
           radius,
-          height: 500,
+          height: 2000,
           segments: 48,
         },
       },

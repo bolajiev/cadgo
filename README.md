@@ -6,6 +6,9 @@ Cadgo is a browser-based AI mechanism workbench. Describe a functional object in
 
 Built for the **Victoria VR AI Builder Hackathon 2026** (category: AI-assisted 3D editing).
 
+**Live demo:** https://cadgo.vercel.app  
+**Repository:** https://github.com/bolajiev/cadgo
+
 ![Landing](docs/landing.png)
 
 ## What it does
@@ -83,6 +86,10 @@ npm run check:examples   # compile all four studies through Manifold
 npm run typecheck
 npm run build
 ```
+
+## Demo
+
+Open **https://cadgo.vercel.app**, type a brief, or load one of the four benchbook studies. The first live draft uses a large model and usually takes 20–50 seconds; the benchbook is instant and every study remains fully editable.
 
 ## Try this
 

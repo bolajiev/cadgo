@@ -12,3 +12,4 @@ coverage
 shots
 
 *.tsbuildinfo
+.env*

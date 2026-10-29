@@ -36,8 +36,8 @@ The LLM is the **design compiler**. It receives the brief, a CadSpec contract an
 
 ## Links
 
-- Repository: `<add public repo URL>`
-- Live demo: `<add hosted demo URL>`
+- Repository: https://github.com/bolajiev/cadgo
+- Live demo: https://cadgo.vercel.app
 - Video: `<add video URL>`
 
 ## Credits
