@@ -52,8 +52,8 @@ export class DrafterError extends Error {
 }
 
 const BASE_URL = process.env.OPENCODE_GO_BASE_URL ?? "https://opencode.ai/zen/go/v1";
-const MODEL = process.env.OPENCODE_GO_MODEL ?? "glm-5.3-flash";
-const FALLBACK_MODEL = process.env.OPENCODE_GO_FALLBACK_MODEL ?? "deepseek-v4.1-flash";
+const MODEL = process.env.OPENCODE_GO_MODEL ?? "deepseek-v4.1-flash";
+const FALLBACK_MODEL = process.env.OPENCODE_GO_FALLBACK_MODEL ?? "glm-5.3-flash";
 const API_KEY = process.env.OPENCODE_GO_API_KEY ?? "";
 
 const cache = new Map<string, SpecResult>();

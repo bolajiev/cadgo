@@ -44,7 +44,7 @@ joint solver ──► posed matrices • joint gizmos • motion timeline
 React Three Fiber scene ──► STL / GLB / plate PNG / share URL
 ```
 
-The model is **GLM-5.3 Flash** through OpenCode Go, with **DeepSeek V4.1 Flash** as a fallback. The LLM writes a data-only `CadSpec` — never executable code. A deterministic compiler turns that spec into geometry; if a draft does not validate or build, Cadgo repairs it and then falls back to a curated study rather than leaving a blank bench.
+The model is **DeepSeek V4.1 Flash** through OpenCode Go, with **GLM-5.3 Flash** as a fallback. The LLM writes a data-only `CadSpec` — never executable code. A deterministic compiler turns that spec into geometry; if a draft does not validate or build, Cadgo repairs it and then falls back to a curated study rather than leaving a blank bench.
 
 Every generated model keeps:
 
@@ -73,8 +73,8 @@ Environment:
 |---|---|---|
 | `OPENCODE_GO_API_KEY` | — | server-side key; never sent to the browser |
 | `OPENCODE_GO_BASE_URL` | `https://opencode.ai/zen/go/v1` | OpenAI-compatible endpoint |
-| `OPENCODE_GO_MODEL` | `glm-5.3-flash` | primary design compiler |
-| `OPENCODE_GO_FALLBACK_MODEL` | `deepseek-v4.1-flash` | second pass on failure |
+| `OPENCODE_GO_MODEL` | `deepseek-v4.1-flash` | primary design compiler |
+| `OPENCODE_GO_FALLBACK_MODEL` | `glm-5.3-flash` | second pass on failure |
 
 The key is used only in `app/api/generate` and `app/api/edit`, with per-IP rate limits and a token cap. The demo also works from the four local benchbook studies if the drafter is unavailable.
 
@@ -110,7 +110,7 @@ If a live draft is slow, the loading card offers a proven bench study. The live 
 
 ## Built with
 
-Next.js 16, React 19, React Three Fiber, three.js, manifold-3d, Zustand, Zod, Vercel, and an OpenAI-compatible model endpoint (GLM-5.3 Flash / DeepSeek V4.1 Flash via OpenCode Go).
+Next.js 16, React 19, React Three Fiber, three.js, manifold-3d, Zustand, Zod, Vercel, and an OpenAI-compatible model endpoint (DeepSeek V4.1 Flash / GLM-5.3 Flash via OpenCode Go).
 
 The visual system — paper-and-ink plates, technical frames, ruler-marked readouts — was designed with the [Anatomy](https://github.com/wheresryan22/anatomy) craft rules in mind. The hero and study images are renders of Cadgo's own models. Third-party licenses are listed in [THIRD_PARTY.md](THIRD_PARTY.md).
 

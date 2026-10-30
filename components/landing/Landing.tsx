@@ -185,7 +185,7 @@ export function Landing() {
         </div>
         <div className="how-credit">
           <span className="eyebrow">Built with</span>
-          <span className="mono">Manifold · Three.js · GLM-5.3 Flash</span>
+          <span className="mono">Manifold · Three.js · DeepSeek V4.1 Flash</span>
         </div>
       </section>
     </main>

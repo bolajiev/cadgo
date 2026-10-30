@@ -34,7 +34,7 @@ Target length: **2:45**. Record at 1440×900 or 1920×1080, browser zoom 100%. U
 
 **2:20–2:35 — The pipeline**
 - Cut to the benchbook / a quick architecture card (optional).
-- Voice: “GLM-5.3 Flash or DeepSeek writes a validated CadSpec. Manifold builds solids. A joint solver poses them. If a draft fails, Cadgo repairs it or falls back to a proven study — the demo never dead-ends.”
+- Voice: “DeepSeek V4.1 Flash or GLM writes a validated CadSpec. Manifold builds solids. A joint solver poses them. If a draft fails, Cadgo repairs it or falls back to a proven study — the demo never dead-ends.”
 - Show the four benchbook cards.
 
 **2:35–2:45 — Close**
