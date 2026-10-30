@@ -19,6 +19,11 @@ export type StudioSource = {
   url: string;
 };
 
+export type StudioPart = {
+  name: string;
+  quantity: number;
+};
+
 export type StudioMessage = {
   id: string;
   role: "user" | "ai" | "system";
@@ -35,7 +40,7 @@ type ApiArtifact = {
   code: string;
   message: string;
   model?: string;
-  parts?: string[];
+  parts?: StudioPart[];
   sources?: StudioSource[];
 };
 
@@ -53,7 +58,7 @@ type StudioState = {
   booted: boolean;
   title: string;
   code: string;
-  parts: string[];
+  parts: StudioPart[];
   params: ParameterDef[];
   values: Record<string, ScadParamValue>;
   mesh: ScadMesh | null;
@@ -135,10 +140,8 @@ function message(
 
 function makeModelLabel(model?: string) {
   if (!model) return undefined;
-  if (/gpt-6/i.test(model)) return "GPT 6 Luna";
-  if (/gpt-5/i.test(model)) return "GPT 5.6 Luna";
   if (/kimi/i.test(model)) return "Kimi K3.1 Pro";
-  if (/deepseek/i.test(model)) return model.includes("pro") ? "DeepSeek V4 Pro" : "DeepSeek";
+  if (/deepseek/i.test(model)) return model.includes("pro") ? "DeepSeek V4 Pro" : "DeepSeek V4.1 Flash";
   if (/glm/i.test(model)) return "GLM";
   return model;
 }
@@ -177,13 +180,18 @@ async function evaluateCode(code: string): Promise<CompileOutcome> {
 async function repairArtifact(
   code: string,
   error: string,
-  parts: string[],
+  parts: StudioPart[],
   sessionIdValue: string,
 ): Promise<ApiArtifact> {
   const response = await fetch("/api/studio/repair", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, error, parts, sessionId: sessionIdValue }),
+    body: JSON.stringify({
+      code,
+      error,
+      parts: parts.map((part) => part.quantity > 1 ? `${part.name} (qty ${part.quantity})` : part.name),
+      sessionId: sessionIdValue,
+    }),
   });
   const payload = await response.json();
   if (!response.ok || !payload.code) {
@@ -194,7 +202,7 @@ async function repairArtifact(
     code: payload.code,
     message: payload.message ?? "Fixed the model.",
     model: payload.model,
-    parts: Array.isArray(payload.parts) ? payload.parts : parts,
+    parts: normalizeParts(payload.parts, parts),
     sources: Array.isArray(payload.sources) ? payload.sources : [],
   };
 }
@@ -208,6 +216,32 @@ function downloadBlob(blob: Blob, filename: string) {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function normalizeParts(value: unknown, fallback: StudioPart[] = []): StudioPart[] {
+  if (!Array.isArray(value)) return fallback;
+  const merged = new Map<string, number>();
+  for (const entry of value) {
+    let name = "";
+    let quantity = 1;
+    if (typeof entry === "string") {
+      name = entry.trim();
+    } else if (entry && typeof entry === "object") {
+      const item = entry as Record<string, unknown>;
+      if (typeof item.name === "string") name = item.name.trim();
+      if (typeof item.quantity === "number" && Number.isFinite(item.quantity)) {
+        quantity = Math.max(1, Math.min(24, Math.round(item.quantity)));
+      }
+    }
+    if (!name) continue;
+    merged.set(name, Math.min(24, (merged.get(name) ?? 0) + quantity));
+  }
+  const result = [...merged.entries()].slice(0, 12).map(([name, quantity]) => ({ name, quantity }));
+  return result.length ? result : fallback;
+}
+
+function expectedBodies(parts: StudioPart[]) {
+  return parts.reduce((sum, part) => sum + Math.max(1, part.quantity), 0);
 }
 
 function safeName(title: string) {
@@ -232,25 +266,27 @@ function changedLineCount(before: string, after: string) {
 }
 
 
-function geometryIssue(outcome: CompileOutcome, parts: string[]) {
+function geometryIssue(outcome: CompileOutcome, parts: StudioPart[]) {
   if (!outcome.ok || !outcome.mesh) {
     return outcome.error ?? outcome.logs ?? "The kernel could not build this model.";
   }
   if (!parts.length) return null;
   const bodies = outcome.mesh.components;
-  if (bodies !== parts.length) {
-    return `The kernel found ${bodies} connected bod${bodies === 1 ? "y" : "ies"} but the design declares ${parts.length} separate part${parts.length === 1 ? "" : "s"}. Keep every declared part its own watertight body with 0.2-0.8 mm clearance at mating faces; do not union distinct parts. If one part is made of multiple pieces, make it one watertight solid.`;
+  const expected = expectedBodies(parts);
+  if (bodies !== expected) {
+    return `The kernel found ${bodies} connected bod${bodies === 1 ? "y" : "ies"} but the parts manifest expects ${expected} bod${expected === 1 ? "y" : "ies"}. Keep every declared part instance its own watertight body with 0.2-0.8 mm clearance at mating faces; do not union distinct parts. If one part type has quantity 2, model two separate instances, not one fused pair.`;
   }
   return null;
 }
 
 function artifactNote(artifact: ApiArtifact, outcome: CompileOutcome, repaired: number) {
   const label = makeModelLabel(artifact.model) ?? "Design compiler";
-  const partCount = artifact.parts?.length ?? 0;
+  const parts = artifact.parts ?? [];
   const bodyCount = outcome.mesh?.components ?? 0;
   const bits = [label];
-  if (partCount) bits.push(`${partCount} part${partCount === 1 ? "" : "s"}`);
-  if (partCount && bodyCount && bodyCount !== partCount) bits.push(`${bodyCount} bodies`);
+  if (bodyCount) bits.push(`${bodyCount} bod${bodyCount === 1 ? "y" : "ies"}`);
+  if (parts.length > 1) bits.push(`${parts.length} part types`);
+  if (parts.length && bodyCount !== expectedBodies(parts)) bits.push("body mismatch");
   if (artifact.sources?.length) bits.push(`${artifact.sources.length} source${artifact.sources.length === 1 ? "" : "s"}`);
   if (repaired) bits.push(repaired === 1 ? "quality-repaired" : `quality-repaired ×${repaired}`);
   return bits.join(" · ");
@@ -468,7 +504,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         code: payload.code,
         message: payload.message ?? "Drafted the model.",
         model: payload.model,
-        parts: Array.isArray(payload.parts) ? payload.parts : [],
+        parts: normalizeParts(payload.parts),
         sources: Array.isArray(payload.sources) ? payload.sources : [],
       };
       set({ status: "compiling" });
@@ -552,7 +588,12 @@ export const useStudio = create<StudioState>((set, get) => ({
       const response = await fetch("/api/studio/edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, message: text, parts: get().parts, sessionId: sessionId() }),
+        body: JSON.stringify({
+          code,
+          message: text,
+          parts: get().parts.map((part) => part.quantity > 1 ? `${part.name} (qty ${part.quantity})` : part.name),
+          sessionId: sessionId(),
+        }),
         signal: currentAbort.signal,
       });
       if (token !== requestSeq) return;
@@ -563,7 +604,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         code: payload.code,
         message: payload.message ?? "Revised the model.",
         model: payload.model,
-        parts: Array.isArray(payload.parts) ? payload.parts : get().parts,
+        parts: normalizeParts(payload.parts, get().parts),
         sources: Array.isArray(payload.sources) ? payload.sources : [],
       };
       set({ status: "compiling" });

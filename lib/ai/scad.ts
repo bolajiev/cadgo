@@ -27,13 +27,18 @@ export type ScadSource = {
   url: string;
 };
 
+export type ScadPart = {
+  name: string;
+  quantity: number;
+};
+
 export type ScadArtifact = {
   title: string;
   code: string;
   message: string;
   model: string;
   ms: number;
-  parts: string[];
+  parts: ScadPart[];
   sources: ScadSource[];
 };
 
@@ -54,7 +59,7 @@ export class ScadError extends Error {
 }
 
 const BASE_URL = process.env.OPENCODE_GO_BASE_URL ?? "https://opencode.ai/zen/go/v1";
-const MODEL = process.env.OPENCODE_GO_DESIGN_MODEL ?? "gpt-6-luna";
+const MODEL = process.env.OPENCODE_GO_DESIGN_MODEL ?? "deepseek-v4.1-flash";
 const FALLBACK_MODEL = process.env.OPENCODE_GO_DESIGN_FALLBACK_MODEL ?? "kimi-k3.1-pro";
 const API_KEY = process.env.OPENCODE_GO_API_KEY ?? "";
 
@@ -87,11 +92,18 @@ const createTool = {
             properties: {
               name: { type: "string", description: "Short real part name." },
               role: { type: "string", description: "Its role in the assembly." },
+              quantity: {
+                type: "integer",
+                minimum: 1,
+                maximum: 24,
+                description: "How many separate instances of this part are in the assembly.",
+              },
             },
-            required: ["name", "role"],
+            required: ["name", "role", "quantity"],
             additionalProperties: false,
           },
-          description: "The bill of parts. Each entry must be one separate connected body in the mesh.",
+          description:
+            "The bill of parts. Quantity is the number of separate bodies of this type; the sum must equal the mesh body count.",
         },
       },
       required: ["title", "code", "message", "parts"],
@@ -151,6 +163,7 @@ PLANNING RULES
 - A single-part object has exactly one part. An assembly lists every screw, pin, lid, motor, bearing or handle as a separate part.
 - Parts must be separate bodies with 0.2–0.8 mm clearance at mating faces. They must not be fused.
 - List lookups for named real components, standards, fasteners, motors, boards and fittings. Do not invent a mounting pattern you can verify.
+- For fasteners, plan clearance holes, not tapped holes. Every screw or bolt instance must remain a separate body with clearance.
 - Use the user's dimensions first. Mark missing dimensions as assumed.
 - Be concise. No prose outside the JSON.`;
 
@@ -162,10 +175,12 @@ You have one tool: create_scad. Return exactly one create_scad call containing a
 REAL CAD / PARTS
 - A part is a standalone, watertight, printable body. A feature or a hole is not a part.
 - If the object is one part, return exactly one connected body and declare one part.
-- If the object is an assembly, every declared part must be its own connected body with a small visible clearance (0.2–0.8 mm) at mating faces. Do not union distinct parts into one solid. If parts overlap or touch, they become one body and the result is rejected.
+- If the object is an assembly, every declared part instance must be its own connected body with a small visible clearance (0.2–0.8 mm) at mating faces. Do not union distinct parts into one solid. If parts overlap or touch, they become one body and the result is rejected.
 - Keep the assembly in its working position, not exploded, unless the brief asks for an exploded view.
 - Do not add unrequested loose parts, decorative floating solids or disconnected fragments. Every body must be in the parts manifest.
-- Screws, pins, bearings, motors, lids and handles are parts when present. Model them as separate solids with realistic clearances.
+- The parts manifest is a bill of materials: use the same name and a quantity for identical parts (for example two M4 screws). The sum of quantities must equal the number of connected bodies in the mesh.
+- Screws, pins, bearings, motors, lids and handles are parts when present. Model every instance as a separate solid with realistic clearances.
+- Fasteners must not intersect the parts they pass through. Use through clearance holes 0.3–0.5 mm larger than the shank in every part, plus a small axial gap under the head. Do not model threads, tap holes or press fits: those fuse parts. If a thread is wanted, draw it only on the separate screw; the mating part still gets clearance.
 - Use colour to distinguish parts. 1–4 intentional colours; a neutral structure plus accents reads well.
 
 OPENSCAD
@@ -213,7 +228,7 @@ You are revising an existing assembly. Return the complete revised source and pa
 const REPAIR_SYSTEM = `${DESIGN_RULES}
 
 You are fixing OpenSCAD source that failed a build check. Return the complete corrected source and parts manifest.
-Keep the design intent and parameter names. Fix the syntax, geometry, or body-count problem named in the check. If the check says the body count does not match the parts manifest, separate the declared parts with clearance; do not fuse them. Do not simplify the model away.`;
+Keep the design intent and parameter names. Fix the syntax, geometry, or body-count problem named in the check. If the body count does not match the parts manifest, fasteners are the usual cause: replace tap holes with through clearance holes 0.3–0.5 mm larger than the shank, remove threads from mating parts, and add an axial gap under each head. Every declared instance must be its own body. Do not simplify the model away.`;
 
 function parseToolArguments(value: string | Record<string, unknown> | undefined) {
   if (!value) return null;
@@ -229,18 +244,26 @@ function parseToolArguments(value: string | Record<string, unknown> | undefined)
   }
 }
 
-function parseParts(raw: Record<string, unknown>) {
+function parseParts(raw: Record<string, unknown>): ScadPart[] {
   const entries = Array.isArray(raw.parts) ? raw.parts : [];
-  const names = entries.flatMap((entry) => {
-    if (typeof entry === "string") return [entry.trim()];
-    if (entry && typeof entry === "object" && "name" in entry) {
-      const name = (entry as { name?: unknown }).name;
-      return typeof name === "string" ? [name.trim()] : [];
+  const merged = new Map<string, number>();
+  for (const entry of entries) {
+    let name = "";
+    let quantity = 1;
+    if (typeof entry === "string") {
+      name = entry.trim();
+    } else if (entry && typeof entry === "object") {
+      const item = entry as Record<string, unknown>;
+      if (typeof item.name === "string") name = item.name.trim();
+      if (typeof item.quantity === "number" && Number.isFinite(item.quantity)) {
+        quantity = Math.max(1, Math.min(24, Math.round(item.quantity)));
+      }
     }
-    return [];
-  });
-  const unique = [...new Set(names.filter(Boolean))].slice(0, 12);
-  return unique.length ? unique : ["Body"];
+    if (!name) continue;
+    merged.set(name, Math.min(24, (merged.get(name) ?? 0) + quantity));
+  }
+  const result = [...merged.entries()].slice(0, 12).map(([name, quantity]) => ({ name, quantity }));
+  return result.length ? result : [{ name: "Body", quantity: 1 }];
 }
 
 function parseJsonObject(text: string) {
@@ -359,6 +382,7 @@ async function callModel(
     body.tools = tools;
     body.tool_choice = "auto";
   }
+  if (/deepseek|glm/i.test(model)) body.thinking = { type: "disabled" };
   let response: Response;
   try {
     response = await fetch(`${BASE_URL}/chat/completions`, {

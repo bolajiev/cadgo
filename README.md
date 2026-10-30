@@ -21,7 +21,7 @@ The app opens on a **blank new part** — no hardcoded preview. **New page** ope
 - **Research before drawing.** A planning pass lists every real part and the standards/missing dimensions to verify. The server searches for those references and shows the sources beside the reply; if a lookup fails, the assumption is stated.
 - **Optional inspector.** Dimensions and Source are buttons, not default panels. The stage keeps the space; open the inspector only when you need a slider or the code.
 - **Direct download.** The header's Download button saves the current, edited part as STL. Source export and share links live in Export.
-- **Plan-first quality pass.** GPT 6 Luna first decomposes the object into real parts and researches named standards, then writes OpenSCAD. The slow path is deliberate: no 4-second fast pass and no fused assemblies. A local compiler and body-count check are the gates.
+- **Plan-first quality pass.** DeepSeek V4.1 Flash first decomposes the object into real parts and researches named standards, then writes OpenSCAD. The deliberate path has no 4-second fast pass and no fused assemblies. A local compiler and body-count check are the gates.
 - **Benchbook.** A knurled knob, honeycomb bracket, twisted vase and spur gear load instantly and stay fully parametric.
 
 ![The blank new-part state, prompt composer and benchbook entry point](docs/studio-panel.png)
@@ -52,7 +52,7 @@ brief ──► planner: parts + dimensions + lookups
               ├─► reference research (real sources, shown in chat)
               │
               ▼
-        CAD writer: GPT 6 Luna ──► OpenSCAD source ──► local OpenSCAD WASM compile
+        CAD writer: DeepSeek V4.1 Flash ──► OpenSCAD source ──► local OpenSCAD WASM compile
               ▲                                           │
               │                                           ├─ mesh + colours + body count
               └─► compiler / body-count repair ◄──────────┤
@@ -85,7 +85,7 @@ Open `http://localhost:3000`. The part studio is `/` and starts on a blank new p
 |---|---|---|
 | `OPENCODE_GO_API_KEY` | — | server-side key; never sent to the browser |
 | `OPENCODE_GO_BASE_URL` | `https://opencode.ai/zen/go/v1` | OpenAI-compatible endpoint |
-| `OPENCODE_GO_DESIGN_MODEL` | `gpt-6-luna` | planner and CAD writer |
+| `OPENCODE_GO_DESIGN_MODEL` | `deepseek-v4.1-flash` | planner and CAD writer |
 | `OPENCODE_GO_DESIGN_FALLBACK_MODEL` | `kimi-k3.1-pro` | fallback if the primary fails |
 
 ### Checks
@@ -123,7 +123,7 @@ The app opens blank. Loading a bench study or generating a part is an explicit a
 
 ## Built with
 
-Next.js 16, React 19, React Three Fiber, three.js, **OpenSCAD WebAssembly**, Zustand, Zod, Vercel. The design engine uses an OpenAI-compatible endpoint (GPT 6 Luna / Kimi K3.1 Pro via OpenCode Go).
+Next.js 16, React 19, React Three Fiber, three.js, **OpenSCAD WebAssembly**, Zustand, Zod, Vercel. The design engine uses an OpenAI-compatible endpoint (DeepSeek V4.1 Flash / Kimi K3.1 Pro via OpenCode Go).
 
 The paper-and-ink plate language was informed by the [Anatomy](https://github.com/wheresryan22/anatomy) craft rules. The OpenSCAD WASM distribution and its source offer come from [CADAM](https://github.com/Adam-CAD/CADAM); see [THIRD_PARTY.md](THIRD_PARTY.md).
 

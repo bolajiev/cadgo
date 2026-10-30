@@ -4075,3 +4075,9 @@ a {
   line-height: 1.45;
   color: var(--muted);
 }
+
+.studio-part-qty {
+  margin-left: auto;
+  font-size: 7.5px;
+  color: var(--accent);
+}

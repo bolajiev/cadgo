@@ -106,6 +106,7 @@ export function StudioApp() {
   const compileMs = useStudio((state) => state.compileMs);
   const params = useStudio((state) => state.params);
   const parts = useStudio((state) => state.parts);
+  const declaredBodies = parts.reduce((sum, part) => sum + Math.max(1, part.quantity), 0);
   const messages = useStudio((state) => state.messages);
   const newPart = useStudio((state) => state.newPart);
 
@@ -516,13 +517,13 @@ export function StudioApp() {
             </div>
           ) : null}
 
-          {mesh && ((parts.length > 0 && mesh.components !== parts.length) ||
+          {mesh && ((parts.length > 0 && mesh.components !== declaredBodies) ||
             (parts.length === 1 && mesh.floating > 0)) ? (
             <div className="studio-geometry-warning">
               <Icon name="warning" />
               <span>
-                {parts.length > 0 && mesh.components !== parts.length
-                  ? `${mesh.components} connected bod${mesh.components === 1 ? "y" : "ies"} for ${parts.length} declared part${parts.length === 1 ? "" : "s"}. Ask Cadgo to separate them with clearance.`
+                {parts.length > 0 && mesh.components !== declaredBodies
+                  ? `${mesh.components} connected bod${mesh.components === 1 ? "y" : "ies"} for ${declaredBodies} declared bod${declaredBodies === 1 ? "y" : "ies"}. Ask Cadgo to separate the instances with clearance.`
                   : `${mesh.floating} detached solid${mesh.floating === 1 ? "" : "s"}. Ask Cadgo to connect it to the body.`}
               </span>
             </div>
@@ -586,9 +587,10 @@ export function StudioApp() {
                     {parts.length ? (
                       <div className="studio-part-list">
                         {parts.map((part, index) => (
-                          <div className="studio-part-row" key={`${part}-${index}`}>
+                          <div className="studio-part-row" key={`${part.name}-${index}`}>
                             <span className="mono">{String(index + 1).padStart(2, "0")}</span>
-                            <span>{part}</span>
+                            <span>{part.name}</span>
+                            {part.quantity > 1 ? <span className="mono studio-part-qty">×{part.quantity}</span> : null}
                           </div>
                         ))}
                       </div>
