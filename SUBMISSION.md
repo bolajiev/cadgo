@@ -15,8 +15,10 @@ CAD remains expert software, while most AI 3D tools stop at a mesh. Cadgo gives 
 ## What was built
 
 - Prompt → parametric OpenSCAD source → local WASM mesh → interactive 3D.
-- Top-level Customizer parameters exposed as live sliders; slider edits rewrite the source and recompile locally.
-- Visible, manually editable OpenSCAD code panel.
+- Chat feedback edits the current source in place; the reply reports changed lines instead of starting over.
+- Top-level Customizer parameters exposed as live "Dimensions" sliders; slider edits rewrite the source and recompile locally.
+- Visible, manually editable "Source" panel.
+- Optional reference lookup for named standards when an exact dimension is missing, with public-page fetching and citation.
 - Compiler-error repair loop and disconnected/floating-solid repair.
 - Four complete benchbook studies: knurled knob, honeycomb bracket, twisted hex vase, spur gear.
 - STL / SCAD export and compressed share links.
@@ -28,7 +30,7 @@ The engine is not specific to the four studies. Any OpenSCAD source can be impor
 
 ## How AI is used
 
-The LLM is a **design compiler**, not a mesh generator. It receives the brief, a strict OpenSCAD design contract and worked examples, then returns a complete OpenSCAD program through a tool call. The browser compiles it with OpenSCAD WASM; the compiler log and detected floating solids feed back into a repair pass. The app opens with no preview or starter solid; a model appears only when the user generates one or explicitly opens a bench study. **New page** opens a fresh blank studio in a new tab. The model never executes code on the server. Parameters and direct code edits stay local and deterministic.
+The LLM is a **design compiler**, not a mesh generator. It receives the brief, a strict OpenSCAD design contract and worked examples, then returns a complete OpenSCAD program through a tool call. The browser compiles it with OpenSCAD WASM; the compiler log and detected floating solids feed back into a repair pass. When a brief depends on a named standard part, the agent may use a guarded reference lookup (Wikipedia search or a known public datasheet URL) and must cite it or state its assumption. In chat, the model receives the current source and is instructed to apply the smallest coherent change; the UI reports the changed line count. The app opens with no preview or starter solid; a model appears only when the user generates one or explicitly opens a bench study. **New page** opens a fresh blank studio in a new tab. The model never executes code on the server. Parameters and direct code edits stay local and deterministic.
 
 ## Demo quality
 
@@ -41,6 +43,7 @@ Cadgo opens on a blank new part. The user can type a brief, import a `.scad`, or
 - Customizer-comment parameter extraction; source-preserving parameter updates.
 - OpenCode Go OpenAI-compatible endpoint: DeepSeek V4.1 Flash primary, GLM-5.3 Flash fast pass.
 - Compiler repair, connected-component / AABB floating-solid detection.
+- SSRF-guarded web reference lookup with a public-source allow path and citation.
 - Server-only API key, per-IP rate limits, no account, browser-local share links.
 
 ## Links

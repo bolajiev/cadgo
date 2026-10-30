@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { Toast } from "@/components/ui/Toast";
 import { StudioViewer } from "./StudioViewerClient";
@@ -106,8 +106,7 @@ export function StudioApp() {
   const compileMs = useStudio((state) => state.compileMs);
   const params = useStudio((state) => state.params);
   const messages = useStudio((state) => state.messages);
-  const prompt = useStudio((state) => state.prompt);
-  const refine = useStudio((state) => state.refine);
+  const newPart = useStudio((state) => state.newPart);
   const activeTab = useStudio((state) => state.activeTab);
   const view = useStudio((state) => state.view);
   const fitKey = useStudio((state) => state.fitKey);
@@ -115,8 +114,6 @@ export function StudioApp() {
   const showGrid = useStudio((state) => state.showGrid);
   const model = useStudio((state) => state.model);
   const shareLink = useStudio((state) => state.shareLink);
-  const setPrompt = useStudio((state) => state.setPrompt);
-  const setRefine = useStudio((state) => state.setRefine);
   const generate = useStudio((state) => state.generate);
   const refineModel = useStudio((state) => state.refineModel);
   const loadExample = useStudio((state) => state.loadExample);
@@ -126,7 +123,9 @@ export function StudioApp() {
   const setShowEdges = useStudio((state) => state.setShowEdges);
   const setShowGrid = useStudio((state) => state.setShowGrid);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [chatText, setChatText] = useState("");
   const importScad = useStudio((state) => state.importScad);
 
   const openImporter = () => fileRef.current?.click();
@@ -144,14 +143,22 @@ export function StudioApp() {
     boot();
   }, [boot]);
 
+  const sendChat = () => {
+    const text = chatText.trim();
+    if (!text || busy) return;
+    setChatText("");
+    if (code) refineModel(text);
+    else generate(text);
+  };
+
   useEffect(() => {
     const node = messagesRef.current;
     if (node) node.scrollTop = node.scrollHeight;
   }, [messages, status]);
 
-  const draft = status === "drafting" || status === "repairing";
-  const canGenerate = prompt.trim().length > 2 && !draft;
-  const canRefine = refine.trim().length > 1 && !!code && !draft;
+  const busy = status === "drafting" || status === "repairing" || status === "compiling";
+  const working = status === "drafting" || status === "repairing";
+  const canSend = chatText.trim().length > 1 && !busy;
   const bounds = mesh?.bounds;
   const dims = bounds
     ? [
@@ -172,7 +179,7 @@ export function StudioApp() {
           <span className="studio-badge mono">Part studio</span>
         </a>
         <div className="studio-header-center">
-          <span className={`status-dot ${draft || status === "compiling" || status === "booting" ? "busy" : ""}`} />
+          <span className={`status-dot ${busy || status === "booting" ? "busy" : ""}`} />
           <span className="studio-title-mini">{title}</span>
           <span className="studio-status mono">{statusLabel(status)}</span>
         </div>
@@ -211,39 +218,36 @@ export function StudioApp() {
 
       <main className="studio-main">
         <aside className="studio-left">
-          <section className="studio-card studio-prompt-card">
+          <section className="studio-card studio-chat-card">
             <div className="studio-card-head">
-              <span className="eyebrow">New part</span>
-              <span className="studio-model-chip mono">{model ? "AI" : "CAD"}</span>
+              <span className="eyebrow">Brief / chat</span>
+              <span className="mono studio-hint">{code ? "editing this part" : "new part"}</span>
             </div>
-            <label className="studio-prompt-label" htmlFor="studio-prompt">
-              Describe what to make.
-            </label>
-            <textarea
-              id="studio-prompt"
-              className="studio-textarea"
-              rows={3}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              onKeyDown={(event) => {
-                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                  event.preventDefault();
-                  generate();
-                }
-              }}
-              placeholder="A honeycomb mounting bracket with 80 mm flanges, four M5 holes and a filleted inside corner…"
-            />
-            <div className="studio-prompt-actions">
-              <span className="mono studio-hint">⌘↵ · OpenSCAD · mm</span>
-              <button className="draft-btn" onClick={() => generate()} disabled={!canGenerate}>
-                {draft ? "Drafting…" : "Generate"} <Icon name="arrow" />
-              </button>
-            </div>
-            <div className="studio-import-row">
-              <button className="studio-import" onClick={openImporter} disabled={draft}>
+
+            <div className="studio-chat-tools">
+              <details className="studio-benchbook">
+                <summary>Benchbook</summary>
+                <div className="studio-examples">
+                  {SCAD_EXAMPLES.map((example, index) => (
+                    <button
+                      className="studio-example"
+                      key={example.id}
+                      onClick={() => loadExample(example.id)}
+                      disabled={busy}
+                    >
+                      <span className="studio-example-num mono">0{index + 1}</span>
+                      <span className="studio-example-name">{example.title}</span>
+                      <span className="studio-example-load mono">Load</span>
+                    </button>
+                  ))}
+                </div>
+              </details>
+              <button className="studio-import" onClick={openImporter} disabled={busy}>
                 <Icon name="folder" size={11} /> Import .scad
               </button>
-              <span className="mono studio-hint">bring your own source · parameters extracted</span>
+              <button className="studio-import" onClick={() => newPart()} disabled={busy}>
+                <Icon name="plus" size={11} /> New part
+              </button>
               <input
                 ref={fileRef}
                 type="file"
@@ -256,32 +260,19 @@ export function StudioApp() {
                 }}
               />
             </div>
-            <div className="studio-examples">
-              {SCAD_EXAMPLES.map((example, index) => (
-                <button
-                  className="studio-example"
-                  key={example.id}
-                  onClick={() => loadExample(example.id)}
-                  disabled={draft}
-                >
-                  <span className="studio-example-num mono">0{index + 1}</span>
-                  <span className="studio-example-name">{example.title}</span>
-                  <span className="studio-example-load mono">Load</span>
-                </button>
-              ))}
-            </div>
-          </section>
 
-          <section className="studio-card studio-chat-card">
-            <div className="studio-card-head">
-              <span className="eyebrow">Bench notes</span>
-              <span className="mono studio-hint">{messages.length ? `${messages.length}` : ""}</span>
+            <div className="studio-impact-line">
+              For hardware teams, makers and educators. Keep chatting to refine the same part.
             </div>
+
             <div className="studio-messages" ref={messagesRef}>
               {messages.length === 0 ? (
                 <div className="studio-message ai">
                   <span className="studio-message-role mono">Cadgo</span>
-                  <p>Describe a part, or load a bench study. Parameters rebuild locally; the AI only writes the design.</p>
+                  <p>
+                    Describe a part to make. Once it lands, reply here to change it — the agent edits
+                    the current model, it does not start over.
+                  </p>
                 </div>
               ) : (
                 messages.map((item) => (
@@ -297,33 +288,48 @@ export function StudioApp() {
                   </div>
                 ))
               )}
-              {draft ? (
+              {working ? (
                 <div className="studio-message ai pending">
                   <span className="status-dot busy" />
-                  <p>{status === "repairing" ? "Repairing the compiler error…" : "Drafting in OpenSCAD…"}</p>
+                  <p>
+                    {status === "drafting"
+                      ? code
+                        ? "Editing the current part…"
+                        : "Drafting in OpenSCAD…"
+                      : status === "repairing"
+                        ? "Repairing the compiler error…"
+                        : "Compiling locally…"}
+                  </p>
                 </div>
               ) : null}
             </div>
-            <div className="studio-refine">
-              <label className="sr-only" htmlFor="studio-refine">
-                Refine the current part
-              </label>
-              <input
-                id="studio-refine"
-                className="studio-refine-input"
-                value={refine}
-                onChange={(event) => setRefine(event.target.value)}
+
+            <div className="studio-compose">
+              <textarea
+                ref={composerRef}
+                id="studio-chat-input"
+                className="studio-compose-input"
+                rows={2}
+                value={chatText}
+                onChange={(event) => setChatText(event.target.value)}
                 onKeyDown={(event) => {
                   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                     event.preventDefault();
-                    refineModel();
+                    sendChat();
                   }
                 }}
-                placeholder="Refine: add a chamfer, change the bore, make it 20% wider…"
+                placeholder={
+                  code
+                    ? "Ask for a change — make the flange 6 mm thicker, add a cable slot…"
+                    : "Describe a part — a 100 × 60 × 8 mm mounting plate with four 5 mm holes…"
+                }
               />
-              <button className="btn" onClick={() => refineModel()} disabled={!canRefine}>
-                Refine
-              </button>
+              <div className="studio-compose-actions">
+                <span className="mono studio-hint">⌘↵ · {code ? "edits this part" : "creates a part"}</span>
+                <button className="draft-btn" onClick={sendChat} disabled={!canSend}>
+                  {busy ? "Working…" : code ? "Send" : "Generate"} <Icon name="arrow" />
+                </button>
+              </div>
             </div>
           </section>
         </aside>
@@ -417,7 +423,7 @@ export function StudioApp() {
                   <span><b>03</b> Tune params / code</span>
                 </div>
                 <div className="studio-empty-actions">
-                  <button className="btn btn-primary" onClick={() => document.querySelector<HTMLTextAreaElement>("#studio-prompt")?.focus()}>
+                  <button className="btn btn-primary" onClick={() => composerRef.current?.focus()}>
                     <Icon name="cursor" /> Write a brief
                   </button>
                   <button className="btn" onClick={openImporter}>
@@ -452,7 +458,7 @@ export function StudioApp() {
             </div>
           ) : null}
 
-          {draft && mesh ? (
+          {busy && mesh ? (
             <div className="studio-busy-strip">
               <span className="status-dot busy" />
               <span className="mono">
@@ -517,14 +523,19 @@ export function StudioApp() {
               className={`studio-tab ${activeTab === "parameters" ? "active" : ""}`}
               onClick={() => setActiveTab("parameters")}
             >
-              Parameters <span className="mono">{params.length}</span>
+              Dimensions <span className="mono">{params.length}</span>
             </button>
             <button
               className={`studio-tab ${activeTab === "code" ? "active" : ""}`}
               onClick={() => setActiveTab("code")}
             >
-              OpenSCAD
+              Source
             </button>
+          </div>
+          <div className="studio-tab-purpose">
+            {activeTab === "parameters"
+              ? "Live dimensions — local rebuilds, no AI"
+              : "The actual OpenSCAD — inspect, edit, compile"}
           </div>
           <div className="studio-panel-body">
             {activeTab === "parameters" ? <StudioParameters /> : <StudioCode />}

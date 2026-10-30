@@ -66,6 +66,7 @@ type StudioState = {
   loadFromHash: () => Promise<boolean>;
   loadExample: (id: string) => Promise<void>;
   importScad: (code: string, title?: string) => Promise<void>;
+  newPart: () => void;
   generate: (prompt?: string) => Promise<void>;
   refineModel: (message?: string) => Promise<void>;
   setPrompt: (value: string) => void;
@@ -193,6 +194,23 @@ function safeName(title: string) {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60) || "cadgo-part";
 }
 
+function changedLineCount(before: string, after: string) {
+  const a = before.split("\n");
+  const b = after.split("\n");
+  let previous = new Uint16Array(b.length + 1);
+  let current = new Uint16Array(b.length + 1);
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = a[i - 1] === b[j - 1] ? previous[j - 1] + 1 : Math.max(previous[j], current[j - 1]);
+    }
+    const swap = previous;
+    previous = current;
+    current = swap;
+    current.fill(0);
+  }
+  return Math.max(a.length, b.length) - previous[b.length];
+}
+
 export const useStudio = create<StudioState>((set, get) => ({
   booted: false,
   title: "New part",
@@ -260,6 +278,32 @@ export const useStudio = create<StudioState>((set, get) => ({
     } catch {
       return false;
     }
+  },
+
+  newPart: () => {
+    requestSeq++;
+    currentAbort?.abort();
+    currentAbort = null;
+    if (compileTimer) clearTimeout(compileTimer);
+    ++compileSeq;
+    set({
+      title: "New part",
+      code: "",
+      codeDraft: "",
+      params: [],
+      values: {},
+      mesh: null,
+      status: "idle",
+      error: null,
+      logs: "",
+      compileMs: 0,
+      prompt: "",
+      refine: "",
+      messages: [],
+      model: "",
+      activeTab: "parameters",
+      fitKey: get().fitKey + 1,
+    });
   },
 
   importScad: async (code, title) => {
@@ -489,6 +533,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         });
         return;
       }
+      const changed = changedLineCount(code, artifact.code);
       set({
         title: artifact.title,
         code: artifact.code,
@@ -507,7 +552,7 @@ export const useStudio = create<StudioState>((set, get) => ({
           message(
             "ai",
             artifact.message,
-            `${makeModelLabel(artifact.model) ?? "Design compiler"}${repaired ? " · repaired compiler error" : ""}`,
+            `Edited in place · ${changed} line${changed === 1 ? "" : "s"} changed${repaired ? " · repaired" : ""}`,
           ),
         ],
       });

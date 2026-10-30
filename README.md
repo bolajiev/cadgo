@@ -15,9 +15,11 @@ The app opens on a **blank new part** — no hardcoded preview. **New page** ope
 ## What it does
 
 - **Prompt → parametric CAD.** Write “a 100 × 60 × 8 mm mounting plate with four 5 mm corner holes and rounded corners.” Cadgo writes OpenSCAD, compiles it in the browser, and exposes its dimensions as sliders.
+- **Chat to edit.** Reply in the same thread; the agent revises the current source instead of starting over. The reply reports how many lines changed.
 - **Local parameter rebuilds.** Move a slider and the model recompiles in the browser. No AI round-trip, no server geometry.
 - **Compiler repair.** If generated code does not compile, the compiler log goes back to the model for a fix. Detached floating solids are detected and repaired too.
-- **Editable source.** The OpenSCAD panel shows and edits the actual source. Download the `.scad` or the `.stl`.
+- **Optional web lookup.** For a named standard component where an exact size is missing, the agent can search Wikipedia or fetch an authoritative public page, and must cite it; otherwise it states its assumption.
+- **Editable source.** The source tab shows and edits the actual OpenSCAD. Download the `.scad` or the `.stl`.
 - **Fast fallback.** DeepSeek V4.1 Flash is the default design compiler; a GLM-5.3 Flash fast pass can answer first when the primary is slow. The compiler error loop is the quality gate.
 - **Benchbook.** A knurled knob, honeycomb bracket, twisted vase and spur gear load instantly and stay fully parametric.
 
@@ -110,8 +112,8 @@ The app opens blank. Loading a bench study or generating a part is an explicit a
 
 - **Impact (30%):** turns natural language into an editable, exportable CAD starting point for hardware teams, makers and educators; standard STL/SCAD output fits existing workflows.
 - **Generalizability (25%):** OpenSCAD import, source-preserving parameter extraction and a reusable compile/repair engine apply to arbitrary parametric parts, not just the benchbook.
-- **Technical depth (20%):** local OpenSCAD WebAssembly kernel, module worker, parameter AST/extraction, compiler repair, floating-solid detection, deterministic local rebuilds, binary STL writer, tests.
-- **Demo quality (25%):** blank new-part start, opt-in benchbook, one-screen prompt → model → parameters → code → export; the under-three-minute shot list is in [VIDEO.md](VIDEO.md).
+- **Technical depth (20%):** local OpenSCAD WebAssembly kernel, module worker, parameter extraction, compiler repair, floating-solid detection, deterministic local rebuilds, binary STL writer, SSRF-guarded reference lookup, tests.
+- **Demo quality (25%):** blank new-part start, opt-in benchbook, one-screen chat → model → parameters → source → export; the chat edits the current part; the shot list is in [VIDEO.md](VIDEO.md).
 
 ## Built with
 

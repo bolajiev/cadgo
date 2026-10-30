@@ -1,16 +1,24 @@
 import { jsonrepair } from "jsonrepair";
+import { webLookup } from "./web";
 import { SCAD_EXAMPLES } from "@/lib/scad/examples";
 
-type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+type ChatMessage = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+};
 
 type ToolCall = {
+  id?: string;
+  type?: string;
   function?: { name?: string; arguments?: string | Record<string, unknown> };
 };
 
 type ChatResponse = {
   choices?: {
     finish_reason?: string;
-    message?: { content?: string; tool_calls?: ToolCall[] };
+    message?: { content?: string | null; tool_calls?: ToolCall[] };
   }[];
   error?: { message?: string };
 };
@@ -37,6 +45,29 @@ const FALLBACK_MODEL = process.env.OPENCODE_GO_FALLBACK_MODEL ?? "glm-5.3-flash"
 const API_KEY = process.env.OPENCODE_GO_API_KEY ?? "";
 
 const cache = new Map<string, ScadArtifact>();
+
+const webTool = {
+  type: "function",
+  function: {
+    name: "web_lookup",
+    description:
+      "Search the public web for a real-world dimension or standard part specification, then fetch the top result pages. Use only when the brief names a real standard/component and the exact size is missing. Do not use for aesthetics or proportions.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Specific query, e.g. 'NEMA 17 stepper motor mounting hole spacing dimensions'.",
+        },
+        url: {
+          type: "string",
+          description: "Optional authoritative public URL to fetch directly, e.g. a manufacturer datasheet or Wikipedia page.",
+        },
+      },
+      required: ["query"],
+    },
+  },
+};
 
 const createTool = {
   type: "function",
@@ -89,6 +120,9 @@ CRAFT
 - Vases/containers: closed bottom, wall thickness, rim, twist or facet count.
 - Assemblies: separate coloured solids, small realistic clearances; do not intersect moving parts.
 
+WEB LOOKUP
+You have web_lookup(query, url?). It searches Wikipedia and can fetch a public authoritative URL you already know. Use it only when the brief names a real standard/component whose exact dimension you cannot state confidently (for example NEMA 17, ISO 4762 M5, Raspberry Pi mounting holes, a standard brick, a camera sensor). Do not use it for proportions, aesthetics, or anything already stated in the brief. One lookup is usually enough; at most two. Prefer manufacturer/datasheet/wikipedia sources. If the lookup fails, use standard knowledge and state the assumption in the message. Cite any source URL briefly in the message. Never let a lookup delay the build.
+
 REFERENCE FORMAT (do not copy the subject):
 ${SCAD_EXAMPLES[0].code}
 `;
@@ -111,7 +145,41 @@ You are fixing OpenSCAD source that failed to compile. Return the complete corre
 Keep the design intent and parameter names. Fix the syntax or geometry error named in the compiler log. If the log reports floating/disconnected solids, connect them to the main body or remove them. Do not simplify the model away.`;
 
 function toolSchema() {
-  return [createTool];
+  return [createTool, webTool];
+}
+
+function parseToolArguments(value: string | Record<string, unknown> | undefined) {
+  if (!value) return null;
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    try {
+      return JSON.parse(jsonrepair(value)) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function artifactFromRaw(raw: Record<string, unknown>, model: string, started: number): ScadArtifact {
+  let code = typeof raw.code === "string" ? raw.code : "";
+  code = code.trim();
+  if (/^```/.test(code)) {
+    code = code.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/, "").trim();
+  }
+  if (!code || code.length < 30 || !/;/.test(code)) {
+    throw new ScadError("The design compiler returned an empty model.", 502);
+  }
+  const title =
+    typeof raw.title === "string" && raw.title.trim()
+      ? raw.title.trim().slice(0, 80)
+      : "OpenSCAD model";
+  const message =
+    typeof raw.message === "string" && raw.message.trim()
+      ? raw.message.trim().slice(0, 320)
+      : "Drafted the model.";
+  return { title, code, message, model, ms: Date.now() - started };
 }
 
 async function callOnce(
@@ -123,96 +191,108 @@ async function callOnce(
 ) {
   if (!API_KEY) throw new ScadError("OPENCODE_GO_API_KEY is not set on the server.", 503);
   const started = Date.now();
-  const body: Record<string, unknown> = {
-    model,
-    messages,
-    tools: toolSchema(),
-    tool_choice: "auto",
-    temperature,
-    max_tokens: 12000,
-  };
-  if (/deepseek|glm/i.test(model)) body.thinking = { type: "disabled" };
-  let response: Response;
-  try {
-    response = await fetch(`${BASE_URL}/chat/completions`, {
-      method: "POST",
-      signal,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${API_KEY}`,
-        "x-opencode-session": `cadgo-studio-${sessionId}`.slice(0, 120),
-        "x-opencode-client": "cadgo-studio",
-        "User-Agent": "cadgo-studio/0.2",
-      },
-      body: JSON.stringify(body),
-    });
-  } catch (error) {
+  const conversation: ChatMessage[] = messages.map((item) => ({ ...item }));
+  let lookups = 0;
+  for (let step = 0; step < 5; step++) {
     if (signal.aborted) throw new ScadError("Cancelled", 499);
-    throw new ScadError("The design compiler could not be reached.", 502);
-  }
-  const text = await response.text();
-  let payload: ChatResponse;
-  try {
-    payload = JSON.parse(text) as ChatResponse;
-  } catch {
-    throw new ScadError(`The design compiler returned an unreadable response (${response.status}).`, 502);
-  }
-  if (!response.ok) {
-    const reason = payload.error?.message ?? `HTTP ${response.status}`;
-    if (response.status === 429) throw new ScadError("The design compiler is rate-limited. Try an example.", 429);
-    throw new ScadError(`Design compiler error: ${reason}`, 502);
-  }
-  const choice = payload.choices?.[0];
-  if (!choice) throw new ScadError("The design compiler returned no result.", 502);
-  if (choice.finish_reason === "length") {
-    throw new ScadError("The design compiler ran out of room. Try a simpler part.", 502);
-  }
-  const call = choice.message?.tool_calls?.find((item) => item.function?.name === "create_scad");
-  let raw: Record<string, unknown> | null = null;
-  if (call?.function?.arguments) {
-    const args = call.function.arguments;
-    if (typeof args === "string") {
+    const body: Record<string, unknown> = {
+      model,
+      messages: conversation,
+      tools: toolSchema(),
+      tool_choice: "auto",
+      temperature,
+      max_tokens: 12000,
+    };
+    if (/deepseek|glm/i.test(model)) body.thinking = { type: "disabled" };
+    let response: Response;
+    try {
+      response = await fetch(`${BASE_URL}/chat/completions`, {
+        method: "POST",
+        signal,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${API_KEY}`,
+          "x-opencode-session": `cadgo-studio-${sessionId}`.slice(0, 120),
+          "x-opencode-client": "cadgo-studio",
+          "User-Agent": "cadgo-studio/0.2",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      if (signal.aborted) throw new ScadError("Cancelled", 499);
+      throw new ScadError("The design compiler could not be reached.", 502);
+    }
+    const text = await response.text();
+    let payload: ChatResponse;
+    try {
+      payload = JSON.parse(text) as ChatResponse;
+    } catch {
+      throw new ScadError(`The design compiler returned an unreadable response (${response.status}).`, 502);
+    }
+    if (!response.ok) {
+      const reason = payload.error?.message ?? `HTTP ${response.status}`;
+      if (response.status === 429) throw new ScadError("The design compiler is rate-limited. Try an example.", 429);
+      throw new ScadError(`Design compiler error: ${reason}`, 502);
+    }
+    const choice = payload.choices?.[0];
+    if (!choice) throw new ScadError("The design compiler returned no result.", 502);
+    if (choice.finish_reason === "length") {
+      throw new ScadError("The design compiler ran out of room. Try a simpler part.", 502);
+    }
+    const assistant = choice.message ?? {};
+    const calls = assistant.tool_calls ?? [];
+    const webCalls = calls.filter((call) => call.function?.name === "web_lookup");
+    const specCall = calls.find((call) => call.function?.name === "create_scad");
+
+    if (webCalls.length) {
+      lookups += webCalls.length;
+      if (lookups > 3) throw new ScadError("The design compiler asked for too many web lookups.", 502);
+      conversation.push({
+        role: "assistant",
+        content: assistant.content ?? "",
+        tool_calls: calls,
+      });
+      for (const call of webCalls) {
+        const args = parseToolArguments(call.function?.arguments);
+        const query = typeof args?.query === "string" ? args.query : "";
+        const sourceUrl = typeof args?.url === "string" ? args.url : undefined;
+        const result =
+          query || sourceUrl
+            ? await webLookup(query, sourceUrl)
+            : { query, results: [], error: "Empty lookup query" };
+        conversation.push({
+          role: "tool",
+          tool_call_id: call.id ?? `web-${step}`,
+          content: JSON.stringify(result).slice(0, 7500),
+        });
+      }
+      continue;
+    }
+
+    if (specCall) {
+      const raw = parseToolArguments(specCall.function?.arguments);
+      if (!raw) throw new ScadError("The design compiler returned malformed code data.", 502);
+      return artifactFromRaw(raw, model, started);
+    }
+
+    if (assistant.content) {
+      const content = assistant.content
+        .trim()
+        .replace(/^```(?:scad|openscad|json)?/i, "")
+        .replace(/```$/, "")
+        .trim();
       try {
-        raw = JSON.parse(args) as Record<string, unknown>;
+        const raw = JSON.parse(content) as Record<string, unknown>;
+        return artifactFromRaw(raw, model, started);
       } catch {
-        try {
-          raw = JSON.parse(jsonrepair(args)) as Record<string, unknown>;
-        } catch {
-          throw new ScadError("The design compiler returned malformed code data.", 502);
+        if (content.includes("module") || content.includes("difference") || content.includes("union")) {
+          return artifactFromRaw({ title: "OpenSCAD model", code: content, message: "Designed the model." }, model, started);
         }
       }
-    } else {
-      raw = args;
     }
-  } else if (choice.message?.content) {
-    const content = choice.message.content
-      .trim()
-      .replace(/^```(?:scad|openscad|json)?/i, "")
-      .replace(/```$/, "")
-      .trim();
-    try {
-      raw = JSON.parse(content) as Record<string, unknown>;
-    } catch {
-      if (content.includes("module") || content.includes("difference") || content.includes("union")) {
-        raw = { title: "OpenSCAD model", code: content, message: "Designed the model." };
-      }
-    }
+    throw new ScadError("The design compiler did not return a model.", 502);
   }
-  if (!raw) throw new ScadError("The design compiler did not return a model.", 502);
-  let code = typeof raw.code === "string" ? raw.code : "";
-  code = code.trim();
-  if (/^```/.test(code)) {
-    code = code.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/, "").trim();
-  }
-  if (!code || code.length < 30 || !/;/.test(code)) {
-    throw new ScadError("The design compiler returned an empty model.", 502);
-  }
-  const title = typeof raw.title === "string" && raw.title.trim() ? raw.title.trim().slice(0, 80) : "OpenSCAD model";
-  const message =
-    typeof raw.message === "string" && raw.message.trim()
-      ? raw.message.trim().slice(0, 240)
-      : "Drafted the model.";
-  return { title, code, message, model, ms: Date.now() - started } satisfies ScadArtifact;
+  throw new ScadError("The design compiler used too many steps.", 502);
 }
 
 function raceModels(messages: ChatMessage[], temperature: number, sessionId: string) {
