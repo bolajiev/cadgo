@@ -17,11 +17,11 @@ The app opens on a **blank new part** — no hardcoded preview. **New page** ope
 - **Prompt → parametric CAD.** Write “a 100 × 60 × 8 mm mounting plate with four 5 mm corner holes and rounded corners.” Cadgo writes OpenSCAD, compiles it in the browser, and exposes its dimensions as sliders.
 - **Chat to edit.** Reply in the same thread; the agent revises the current source instead of starting over. The reply reports how many lines changed.
 - **Local parameter rebuilds.** Move a slider and the model recompiles in the browser. No AI round-trip, no server geometry.
-- **Compiler repair.** If generated code does not compile, the compiler log goes back to the model for a fix. Detached floating solids are detected and repaired too.
-- **Optional web lookup.** For a named standard component where an exact size is missing, the agent can search Wikipedia or fetch an authoritative public page, and must cite it; otherwise it states its assumption.
+- **Build checks.** If generated code does not compile, the compiler log goes back to the model. The kernel also counts connected bodies; every declared part must be a separate watertight body, or the model gets a quality-repair pass.
+- **Research before drawing.** A planning pass lists every real part and the standards/missing dimensions to verify. The server searches for those references and shows the sources beside the reply; if a lookup fails, the assumption is stated.
 - **Optional inspector.** Dimensions and Source are buttons, not default panels. The stage keeps the space; open the inspector only when you need a slider or the code.
 - **Direct download.** The header's Download button saves the current, edited part as STL. Source export and share links live in Export.
-- **Fast fallback.** DeepSeek V4.1 Flash is the default design compiler; a GLM-5.3 Flash fast pass can answer first when the primary is slow. The compiler error loop is the quality gate.
+- **Plan-first quality pass.** GPT 6 Luna first decomposes the object into real parts and researches named standards, then writes OpenSCAD. The slow path is deliberate: no 4-second fast pass and no fused assemblies. A local compiler and body-count check are the gates.
 - **Benchbook.** A knurled knob, honeycomb bracket, twisted vase and spur gear load instantly and stay fully parametric.
 
 ![The blank new-part state, prompt composer and benchbook entry point](docs/studio-panel.png)
@@ -40,23 +40,28 @@ The engine is not tied to the four studies.
 
 - **Bring your own source:** import any `.scad`; top-level dimensions become sliders immediately.
 - **Bring your own data:** the OpenSCAD source is visible and editable; the generated program is the artifact, not hidden model state.
-- **Reusable compiler loop:** the same parameter extractor, compiler-error repair, floating-solid check and local worker can sit behind any CAD UI, API or classroom tool.
+- **Reusable compiler loop:** the same parameter extractor, research pass, compiler repair, body-count check and local worker can sit behind any CAD UI, API or classroom tool.
 - **Any part, not one niche:** the benchbook spans a knob, a bracket, a vase and a gear; the prompt path is not limited to those categories.
 - **Export:** `.stl` for printing and `.scad` for the source; no lock-in.
 
 ## How it works
 
 ```
-brief ──► DeepSeek V4.1 Flash ──► OpenSCAD source ──► local OpenSCAD WASM compile
-              │   (GLM fast pass)                         │
-              │                                            ├─ mesh + colours
-              └─► compiler log / detached-part repair ◄────┘
-                                                           │
-                                             parameters ◄──┤
-                                                           └──► STL / SCAD / share
+brief ──► planner: parts + dimensions + lookups
+              │
+              ├─► reference research (real sources, shown in chat)
+              │
+              ▼
+        CAD writer: GPT 6 Luna ──► OpenSCAD source ──► local OpenSCAD WASM compile
+              ▲                                           │
+              │                                           ├─ mesh + colours + body count
+              └─► compiler / body-count repair ◄──────────┤
+                                                          │
+                                            parameters ◄──┤
+                                                          └──► STL / SCAD / share
 ```
 
-The model writes a data-only OpenSCAD program through a tool call. The server never compiles or executes it; the browser does, in a module worker. Parameters are top-level Customizer variables:
+The planner writes a design intent; the server researches its reference queries; the CAD writer turns that into a data-only OpenSCAD program and a bill of parts. The server never compiles or executes the source; the browser does, in a module worker. Parameters are top-level Customizer variables:
 
 ```scad
 // Overall diameter
@@ -80,8 +85,8 @@ Open `http://localhost:3000`. The part studio is `/` and starts on a blank new p
 |---|---|---|
 | `OPENCODE_GO_API_KEY` | — | server-side key; never sent to the browser |
 | `OPENCODE_GO_BASE_URL` | `https://opencode.ai/zen/go/v1` | OpenAI-compatible endpoint |
-| `OPENCODE_GO_MODEL` | `deepseek-v4.1-flash` | primary design compiler |
-| `OPENCODE_GO_FALLBACK_MODEL` | `glm-5.3-flash` | fast parallel pass / fallback |
+| `OPENCODE_GO_DESIGN_MODEL` | `gpt-6-luna` | planner and CAD writer |
+| `OPENCODE_GO_DESIGN_FALLBACK_MODEL` | `kimi-k3.1-pro` | fallback if the primary fails |
 
 ### Checks
 
@@ -105,7 +110,7 @@ The app opens blank. Loading a bench study or generating a part is an explicit a
 ## Limits
 
 - The part studio exports **STL and SCAD**; it is a mesh/OpenSCAD workflow, not a STEP/B-rep kernel.
-- The AI can produce a weak design. The compiler, the detached-solid check and the repair loop catch structural failures, not every bad engineering decision.
+- The AI can produce a weak design. The body-count check and the repair loop catch structural failures, not every bad engineering decision.
 - OpenSCAD WASM is a ~9 MB first load. It is cached by the browser; the first compile wakes it.
 - No account or cloud project database. Share links carry the source in the URL fragment.
 
@@ -113,12 +118,12 @@ The app opens blank. Loading a bench study or generating a part is an explicit a
 
 - **Impact (30%):** turns natural language into an editable, exportable CAD starting point for hardware teams, makers and educators; standard STL/SCAD output fits existing workflows.
 - **Generalizability (25%):** OpenSCAD import, source-preserving parameter extraction and a reusable compile/repair engine apply to arbitrary parametric parts, not just the benchbook.
-- **Technical depth (20%):** local OpenSCAD WebAssembly kernel, module worker, parameter extraction, compiler repair, floating-solid detection, deterministic local rebuilds, binary STL writer, SSRF-guarded reference lookup, tests.
+- **Technical depth (20%):** local OpenSCAD WebAssembly kernel, module worker, parameter extraction, compiler repair, separate-part body checks, deterministic local rebuilds, binary STL writer, SSRF-guarded reference lookup, tests.
 - **Demo quality (25%):** blank new-part start, opt-in benchbook, one-screen chat → model → optional dimensions/source → direct STL download; the chat edits the current part; the shot list is in [VIDEO.md](VIDEO.md).
 
 ## Built with
 
-Next.js 16, React 19, React Three Fiber, three.js, **OpenSCAD WebAssembly**, Zustand, Zod, Vercel. The design compiler uses an OpenAI-compatible endpoint (DeepSeek V4.1 Flash / GLM-5.3 Flash via OpenCode Go).
+Next.js 16, React 19, React Three Fiber, three.js, **OpenSCAD WebAssembly**, Zustand, Zod, Vercel. The design engine uses an OpenAI-compatible endpoint (GPT 6 Luna / Kimi K3.1 Pro via OpenCode Go).
 
 The paper-and-ink plate language was informed by the [Anatomy](https://github.com/wheresryan22/anatomy) craft rules. The OpenSCAD WASM distribution and its source offer come from [CADAM](https://github.com/Adam-CAD/CADAM); see [THIRD_PARTY.md](THIRD_PARTY.md).
 

@@ -3,7 +3,7 @@ import { generateScad, ScadError } from "@/lib/ai/scad";
 import { clientKey, rateLimit } from "@/lib/ai/limit";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const schema = z.object({
   prompt: z.string().min(3).max(1600),
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: "A short part description is required." }, { status: 400 });
   const sessionId = parsed.data.sessionId?.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80) || "anonymous";
   try {
-    const result = await generateScad(parsed.data.prompt, sessionId);
+    const result = await generateScad(parsed.data.prompt, sessionId, request.signal);
     return Response.json(result);
   } catch (error) {
     if (error instanceof ScadError) return Response.json({ error: error.message }, { status: error.status });

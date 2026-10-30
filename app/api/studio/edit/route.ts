@@ -8,6 +8,7 @@ export const maxDuration = 120;
 const schema = z.object({
   code: z.string().min(10).max(60000),
   message: z.string().min(2).max(1000),
+  parts: z.array(z.string().max(80)).max(12).optional(),
   sessionId: z.string().max(120).optional(),
 });
 
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: "The current code and a short request are required." }, { status: 400 });
   const sessionId = parsed.data.sessionId?.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80) || "anonymous";
   try {
-    const result = await editScad(parsed.data.code, parsed.data.message, sessionId);
+    const result = await editScad(parsed.data.code, parsed.data.message, parsed.data.parts ?? [], sessionId, request.signal);
     return Response.json(result);
   } catch (error) {
     if (error instanceof ScadError) return Response.json({ error: error.message }, { status: error.status });

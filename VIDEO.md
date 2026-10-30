@@ -17,7 +17,7 @@ Target length: **2:35**. Record the production build at 1440×900 or 1920×1080.
 - Type: `A 100 x 60 x 8 mm mounting plate with four 5 mm corner holes and rounded corners, one watertight solid`
 - Press **Generate**. Show the busy state.
 - When it lands: orbit; open **Dimensions** (optional); change the corner radius and hole diameter.
-- Voice: “DeepSeek writes a complete OpenSCAD program. The local kernel compiles it. If the code fails, the compiler log goes back to the model for a repair; floating parts get the same treatment.”
+- Voice: “Cadgo plans the real parts, checks the standards it needs, then writes the OpenSCAD. The local kernel compiles it and checks that every declared part stayed a separate body. Failures go back for a repair.”
 
 **1:10–1:35 — Chat to edit**
 - In the chat input below the messages, type: `Make the corner radius 12 mm and add a second pair of holes.`
@@ -26,7 +26,7 @@ Target length: **2:35**. Record the production build at 1440×900 or 1920×1080.
 
 **1:35–1:50 — The benchbook**
 - Click **Benchbook**, then **Honeycomb angle bracket**, **Twisted hex vase**, **Spur gear**. Show the parameters changing.
-- Voice: “Four proven studies load instantly. They are real OpenSCAD programs, not screenshots. Named standards can trigger a guarded reference lookup for missing dimensions.”
+- Voice: “Four proven studies load instantly. They are real OpenSCAD programs, not screenshots. Named standards trigger a guarded research pass, and the sources are shown beside the reply.”
 
 **1:50–2:10 — Export and share**
 - Click **Download** (STL) in the header; show the toast. Open **Export** for SCAD and the share link.

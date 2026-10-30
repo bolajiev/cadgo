@@ -4009,3 +4009,69 @@ a {
     font-size: 7px;
   }
 }
+
+.studio-message-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 7px;
+  margin-top: 5px;
+}
+
+.studio-message-sources a {
+  font-family: var(--mono);
+  font-size: 7px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 2px;
+}
+
+.studio-message-sources a:hover {
+  color: var(--accent);
+}
+
+.studio-parts {
+  border-bottom: 1px solid var(--line);
+  padding: 9px 11px 10px;
+}
+
+.studio-parts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.studio-parts-head .mono {
+  font-size: 7px;
+  color: var(--faint);
+}
+
+.studio-part-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 7px;
+}
+
+.studio-part-row {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 9.5px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.studio-part-row .mono {
+  font-size: 7px;
+  color: var(--faint);
+}
+
+.studio-parts-empty {
+  margin: 7px 0 0;
+  font-size: 9px;
+  line-height: 1.45;
+  color: var(--muted);
+}

@@ -25,9 +25,9 @@ function BrandMark() {
 
 function statusLabel(status: string) {
   if (status === "booting") return "Waking kernel";
-  if (status === "drafting") return "Drafting";
-  if (status === "compiling") return "Recutting";
-  if (status === "repairing") return "Fixing";
+  if (status === "drafting") return "Thinking";
+  if (status === "compiling") return "Building";
+  if (status === "repairing") return "Checking";
   if (status === "error") return "Needs attention";
   return "Ready";
 }
@@ -105,6 +105,7 @@ export function StudioApp() {
   const error = useStudio((state) => state.error);
   const compileMs = useStudio((state) => state.compileMs);
   const params = useStudio((state) => state.params);
+  const parts = useStudio((state) => state.parts);
   const messages = useStudio((state) => state.messages);
   const newPart = useStudio((state) => state.newPart);
 
@@ -292,6 +293,15 @@ export function StudioApp() {
                     </div>
                     <p>{item.text}</p>
                     {item.note ? <span className="studio-message-note mono">{item.note}</span> : null}
+                    {item.sources?.length ? (
+                      <div className="studio-message-sources">
+                        {item.sources.map((source) => (
+                          <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+                            {source.title}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))
               )}
@@ -301,10 +311,10 @@ export function StudioApp() {
                   <p>
                     {status === "drafting"
                       ? code
-                        ? "Editing the current part…"
-                        : "Drafting in OpenSCAD…"
+                        ? "Thinking through the edit. Declared parts stay separate…"
+                        : "Planning the parts, checking references, then building…"
                       : status === "repairing"
-                        ? "Repairing the compiler error…"
+                        ? "Checking the bodies and clearing the repair…"
                         : "Compiling locally…"}
                   </p>
                 </div>
@@ -352,7 +362,9 @@ export function StudioApp() {
               <span className="mono studio-fig-label">FIG. 01 / PART</span>
               <strong>{mesh ? title : "New part"}</strong>
               <span className="mono studio-fig-sub">
-                {mesh ? "Parametric solid · local kernel · millimetres" : "No model yet · describe it or open a bench study"}
+                {mesh
+                  ? `Parametric solid · ${mesh.components} ${mesh.components === 1 ? "body" : "bodies"} · millimetres`
+                  : "No model yet · describe it or open a bench study"}
               </span>
             </div>
             <div className="studio-stage-controls">
@@ -419,6 +431,10 @@ export function StudioApp() {
                   </span>
                 </div>
                 <div>
+                  <span className="readout-label">Bodies</span>
+                  <span className="readout-value">{mesh.components}</span>
+                </div>
+                <div>
                   <span className="readout-label">Triangles</span>
                   <span className="readout-value">{formatNumber(mesh.triangles)}</span>
                 </div>
@@ -468,12 +484,12 @@ export function StudioApp() {
           {!mesh && (status === "drafting" || status === "compiling" || status === "repairing") ? (
             <div className="studio-veil">
               <div className="studio-loading-card">
-                <span className="eyebrow">{status === "drafting" ? "Design compiler" : "Local kernel"}</span>
-                <h2>{status === "drafting" ? "Writing the part" : status === "repairing" ? "Fixing the mesh" : "Compiling locally"}</h2>
+                <span className="eyebrow">{status === "drafting" ? "Design pass" : "Local kernel"}</span>
+                <h2>{status === "drafting" ? "Planning the build" : status === "repairing" ? "Checking the bodies" : "Compiling locally"}</h2>
                 <p>
                   {status === "drafting"
-                    ? "DeepSeek is writing OpenSCAD; the local kernel will compile it here."
-                    : "OpenSCAD WebAssembly is waking up. This happens once per page."}
+                    ? "Cadgo is splitting the object into real parts, checking references and writing the model. This takes longer on purpose."
+                    : "The local kernel is compiling the solid. Nothing is uploaded."}
                 </p>
                 <div className="studio-progress">
                   <span />
@@ -487,9 +503,9 @@ export function StudioApp() {
             <div className="studio-busy-strip">
               <span className="status-dot busy" />
               <span className="mono">
-                {status === "repairing" ? "Repairing compiler error" : "Drafting design"}
+                {status === "repairing" ? "Checking part separation" : "Thinking / researching"}
               </span>
-              <span className="mono studio-hint">DeepSeek + GLM fast pass</span>
+              <span className="mono studio-hint">quality pass · no fast fallback</span>
             </div>
           ) : null}
 
@@ -500,12 +516,14 @@ export function StudioApp() {
             </div>
           ) : null}
 
-          {mesh && mesh.floating > 0 ? (
+          {mesh && ((parts.length > 0 && mesh.components !== parts.length) ||
+            (parts.length === 1 && mesh.floating > 0)) ? (
             <div className="studio-geometry-warning">
               <Icon name="warning" />
               <span>
-                {mesh.floating} detached solid{mesh.floating === 1 ? "" : "s"}. Ask Cadgo to connect it
-                to the body.
+                {parts.length > 0 && mesh.components !== parts.length
+                  ? `${mesh.components} connected bod${mesh.components === 1 ? "y" : "ies"} for ${parts.length} declared part${parts.length === 1 ? "" : "s"}. Ask Cadgo to separate them with clearance.`
+                  : `${mesh.floating} detached solid${mesh.floating === 1 ? "" : "s"}. Ask Cadgo to connect it to the body.`}
               </span>
             </div>
           ) : null}
@@ -558,7 +576,31 @@ export function StudioApp() {
                 : "The actual OpenSCAD — inspect, edit, compile"}
             </div>
             <div className="studio-panel-body">
-              {inspector === "dimensions" ? <StudioParameters /> : <StudioCode />}
+              {inspector === "dimensions" ? (
+                <>
+                  <div className="studio-parts">
+                    <div className="studio-parts-head">
+                      <span className="panel-label">Part manifest</span>
+                      <span className="mono">{mesh ? `${mesh.components} bod${mesh.components === 1 ? "y" : "ies"}` : "—"}</span>
+                    </div>
+                    {parts.length ? (
+                      <div className="studio-part-list">
+                        {parts.map((part, index) => (
+                          <div className="studio-part-row" key={`${part}-${index}`}>
+                            <span className="mono">{String(index + 1).padStart(2, "0")}</span>
+                            <span>{part}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="studio-parts-empty">
+                        Imported source. The kernel found {mesh?.components ?? 0} connected bod{mesh?.components === 1 ? "y" : "ies"}.
+                      </p>
+                    )}
+                  </div>
+                  <StudioParameters />
+                </>
+              ) : <StudioCode />}
             </div>
             <div className="studio-kernel-strip">
               <span className="status-dot" />

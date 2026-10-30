@@ -1,6 +1,5 @@
 import { jsonrepair } from "jsonrepair";
 import { webLookup } from "./web";
-import { SCAD_EXAMPLES } from "@/lib/scad/examples";
 
 type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -23,12 +22,27 @@ type ChatResponse = {
   error?: { message?: string };
 };
 
+export type ScadSource = {
+  title: string;
+  url: string;
+};
+
 export type ScadArtifact = {
   title: string;
   code: string;
   message: string;
   model: string;
   ms: number;
+  parts: string[];
+  sources: ScadSource[];
+};
+
+type DesignPlan = {
+  interpretation: string;
+  parts: string[];
+  lookups: string[];
+  dimensions: { name: string; value: string; source: string }[];
+  risks: string;
 };
 
 export class ScadError extends Error {
@@ -40,113 +54,166 @@ export class ScadError extends Error {
 }
 
 const BASE_URL = process.env.OPENCODE_GO_BASE_URL ?? "https://opencode.ai/zen/go/v1";
-const MODEL = process.env.OPENCODE_GO_MODEL ?? "deepseek-v4.1-flash";
-const FALLBACK_MODEL = process.env.OPENCODE_GO_FALLBACK_MODEL ?? "glm-5.3-flash";
+const MODEL = process.env.OPENCODE_GO_DESIGN_MODEL ?? "gpt-6-luna";
+const FALLBACK_MODEL = process.env.OPENCODE_GO_DESIGN_FALLBACK_MODEL ?? "kimi-k3.1-pro";
 const API_KEY = process.env.OPENCODE_GO_API_KEY ?? "";
 
 const cache = new Map<string, ScadArtifact>();
-
-const webTool = {
-  type: "function",
-  function: {
-    name: "web_lookup",
-    description:
-      "Search the public web for a real-world dimension or standard part specification, then fetch the top result pages. Use only when the brief names a real standard/component and the exact size is missing. Do not use for aesthetics or proportions.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "Specific query, e.g. 'NEMA 17 stepper motor mounting hole spacing dimensions'.",
-        },
-        url: {
-          type: "string",
-          description: "Optional authoritative public URL to fetch directly, e.g. a manufacturer datasheet or Wikipedia page.",
-        },
-      },
-      required: ["query"],
-    },
-  },
-};
 
 const createTool = {
   type: "function",
   function: {
     name: "create_scad",
-    description: "Return a complete, compilable OpenSCAD program for the requested CAD model.",
+    description:
+      "Return a complete, compilable OpenSCAD program and its bill of parts. Every distinct real part must be a separate connected body.",
     parameters: {
       type: "object",
       properties: {
-        title: { type: "string", description: "Short product name, e.g. 'Knurled control knob'" },
+        title: { type: "string", description: "Short product name, e.g. 'Split shaft collar'." },
         code: {
           type: "string",
           description: "The complete OpenSCAD source. Top-level parameters with // [min:max] comments.",
         },
-        message: { type: "string", description: "One short sentence about the model." },
+        message: {
+          type: "string",
+          description: "One short sentence about the model, including assumptions or source names.",
+        },
+        parts: {
+          type: "array",
+          minItems: 1,
+          maxItems: 12,
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Short real part name." },
+              role: { type: "string", description: "Its role in the assembly." },
+            },
+            required: ["name", "role"],
+            additionalProperties: false,
+          },
+          description: "The bill of parts. Each entry must be one separate connected body in the mesh.",
+        },
       },
-      required: ["title", "code", "message"],
+      required: ["title", "code", "message", "parts"],
     },
   },
 };
 
+const REFERENCE = `// Split shaft collar — two separate, clearanced parts
+// [Bore diameter]
+bore = 12; // [6:30]
+// [Outer diameter]
+outer = 30; // [18:60]
+// [Collar width]
+width = 10; // [6:20]
+// [Parting gap]
+gap = 0.5; // [0.2:1.2]
+// [Cap screw diameter]
+screw = 3.4; // [2.5:5]
+// [Screw span]
+span = 36; // [24:80]
+
+$fn = 72;
+
+module half(side = 1) {
+  difference() {
+    intersection() {
+      cylinder(h = width, d = outer, center = true);
+      translate([0, side * gap / 2, 0])
+        cube([outer * 1.6, outer, width + 2], center = true);
+    }
+    cylinder(h = width + 2, d = bore, center = true);
+    for (x = [-1, 1])
+      translate([x * span / 2, 0, 0])
+        rotate([90, 0, 0]) cylinder(h = outer * 2, d = screw, center = true);
+  }
+}
+
+color([0.28, 0.30, 0.33])
+  translate([0, gap / 2 + 0.01, 0]) half(-1);
+color([0.42, 0.18, 0.10])
+  translate([0, -gap / 2 - 0.01, 0]) rotate([0, 0, 180]) half(1);
+`;
+
+const PLANNER_SYSTEM = `You are Cadgo's lead CAD engineer. Plan before anyone writes geometry. Do not write OpenSCAD yet.
+
+Return exactly one JSON object with this shape:
+{
+  "interpretation": "what the object is, its constraints, and what is deliberately assumed",
+  "parts": [{ "name": "short real part name", "role": "what it does and how it mates" }],
+  "dimensions": [{ "name": "dimension", "value": "value and unit", "source": "given | assumed | lookup" }],
+  "lookups": ["specific web search queries for real standards or missing critical dimensions"],
+  "risks": "the most likely geometry, clearance or manufacturability failure"
+}
+
+PLANNING RULES
+- Decompose the object into real, separately manufacturable parts. A hole, fillet or feature is not a part.
+- A single-part object has exactly one part. An assembly lists every screw, pin, lid, motor, bearing or handle as a separate part.
+- Parts must be separate bodies with 0.2–0.8 mm clearance at mating faces. They must not be fused.
+- List lookups for named real components, standards, fasteners, motors, boards and fittings. Do not invent a mounting pattern you can verify.
+- Use the user's dimensions first. Mark missing dimensions as assumed.
+- Be concise. No prose outside the JSON.`;
+
 const DESIGN_RULES = `
-You are Cadgo's OpenSCAD compiler. You write real CAD, not pictures.
+You are Cadgo's design engineer. You produce real, editable CAD, not pretty meshes. You have an approved plan and reference research. Build exactly that.
 
-Return exactly one create_scad tool call containing a COMPLETE, compilable OpenSCAD 2025 program.
+You have one tool: create_scad. Return exactly one create_scad call containing a COMPLETE, compilable OpenSCAD 2025 program and its parts manifest.
 
-HARD RULES
-- Built-in OpenSCAD only. Never use include, use, import, surface, text, or external libraries.
-- Millimetres, Z up. Put the model on z = 0 and centre it around x = 0, y = 0.
-- If the brief names one object, the result must be ONE connected watertight solid. No loose pins, plugs, caps, domes or decorative floating parts.
-- A multi-part assembly is allowed only when the brief explicitly asks for one; every part must touch or overlap another part. Never a 2D-only object.
+REAL CAD / PARTS
+- A part is a standalone, watertight, printable body. A feature or a hole is not a part.
+- If the object is one part, return exactly one connected body and declare one part.
+- If the object is an assembly, every declared part must be its own connected body with a small visible clearance (0.2–0.8 mm) at mating faces. Do not union distinct parts into one solid. If parts overlap or touch, they become one body and the result is rejected.
+- Keep the assembly in its working position, not exploded, unless the brief asks for an exploded view.
+- Do not add unrequested loose parts, decorative floating solids or disconnected fragments. Every body must be in the parts manifest.
+- Screws, pins, bearings, motors, lids and handles are parts when present. Model them as separate solids with realistic clearances.
+- Use colour to distinguish parts. 1–4 intentional colours; a neutral structure plus accents reads well.
+
+OPENSCAD
+- Built-in OpenSCAD 2025 only. Never use include, use, import, surface, text, or external libraries.
+- Millimetres, Z up. Put the assembly on z = 0 and centre it around x = 0, y = 0.
 - Top-level parameters go before the first module/function. Each has a description line and a range:
     // Overall diameter
     diameter = 42; // [24:70]
-  Use 4–8 meaningful parameters. Do not expose implementation variables starting with $.
+  Use 4–9 meaningful parameters. Do not expose implementation variables starting with $.
 - Set $fn = 64 or 96 once for round features.
-- Use color() for 1–3 intentional colours. A neutral body plus one accent reads well.
 - Prefer cylinder, cube, difference, union, intersection, hull, linear_extrude, rotate_extrude and for loops. Avoid minkowski.
-- Make it manufacturable-looking: chamfers, fillets via hull/rounded profiles, bosses, bores, countersinks, lightening holes.
-- Before returning, check every solid touches the main body or another solid. A detached part is a failed model.
-- Keep it under 180 lines. No random(), no animation, no echo output.
-- The geometry must have real volume. Use module definitions for reusable shapes.
-- Compiler errors are fatal. Keep syntax simple and verify every block closes.
+- Make each part manufacturable: wall thickness, chamfers, fillets via hull/rounded profiles, bosses, bores, countersinks, lightening holes. No zero-thickness walls.
+- Keep the source under 220 lines. No random(), no animation, no echo output.
+- Compiler errors are fatal. Verify every block closes and every cut has positive volume.
 
 CRAFT
-- Knobs: knurled rims, a D-bore or keyway, a pointer mark, a set screw.
-- Brackets: two flanges, rounded outside corners, mounting holes, lightening cutouts, a gusset or rib.
-- Housings: wall thickness, bosses, screw holes, chamfered lids.
-- Gears/pulleys: real tooth count, hub, bore, lightening holes.
+- Knobs: knurled rim, a D-bore or keyway, a real separate set screw, a pointer.
+- Brackets: flanges, rounded corners, mounting holes, lightening cutouts, a gusset or rib.
+- Housings: wall thickness, bosses, screw holes, a separate lid, clearance for assembly.
+- Gears/pulleys: real tooth count, hub, bore, lightening holes, a separate shaft or pin.
 - Vases/containers: closed bottom, wall thickness, rim, twist or facet count.
-- Assemblies: separate coloured solids, small realistic clearances; do not intersect moving parts.
+- Mechanisms: separate links, pins, bearings and fasteners with working clearances.
 
-WEB LOOKUP
-You have web_lookup(query, url?). It searches Wikipedia and can fetch a public authoritative URL you already know. Use it only when the brief names a real standard/component whose exact dimension you cannot state confidently (for example NEMA 17, ISO 4762 M5, Raspberry Pi mounting holes, a standard brick, a camera sensor). Do not use it for proportions, aesthetics, or anything already stated in the brief. One lookup is usually enough; at most two. Prefer manufacturer/datasheet/wikipedia sources. If the lookup fails, use standard knowledge and state the assumption in the message. Cite any source URL briefly in the message. Never let a lookup delay the build.
+REFERENCE RESEARCH
+- The user message includes verified lookup results. Use those dimensions. If a lookup failed, state the assumption in the message.
+- Do not invent a standard interface that the research contradicts.
+- Name any source you used in the message.
 
 REFERENCE FORMAT (do not copy the subject):
-${SCAD_EXAMPLES[0].code}
+${REFERENCE}
 `;
 
 const GENERATE_SYSTEM = `${DESIGN_RULES}
 
-Design exactly what the user asks for. Do not add unrelated features. If a dimension is unspecified, choose a believable millimetre value. Use the tool, never prose, for the model.`;
+The approved plan is the design intent. Fix only clear geometry or manufacturability errors in it. Do not add unrelated features. Use the tool, never prose, for the model.`;
 
 const EDIT_SYSTEM = `${DESIGN_RULES}
 
-You are revising an existing OpenSCAD model. Return the complete revised source.
+You are revising an existing assembly. Return the complete revised source and parts manifest.
 - Preserve every parameter name and everything the user did not ask to change.
-- Keep the same colours and overall design language.
-- Apply the smallest coherent change. Keep the code compilable.
+- Keep the same part breakdown, colours and design language unless the request adds or removes a part.
+- Apply the smallest coherent change. Keep every declared part a separate body.
 - If the request is impossible, make the closest safe change and say so in the message.`;
 
 const REPAIR_SYSTEM = `${DESIGN_RULES}
 
-You are fixing OpenSCAD source that failed to compile. Return the complete corrected source.
-Keep the design intent and parameter names. Fix the syntax or geometry error named in the compiler log. If the log reports floating/disconnected solids, connect them to the main body or remove them. Do not simplify the model away.`;
-
-function toolSchema() {
-  return [createTool, webTool];
-}
+You are fixing OpenSCAD source that failed a build check. Return the complete corrected source and parts manifest.
+Keep the design intent and parameter names. Fix the syntax, geometry, or body-count problem named in the check. If the check says the body count does not match the parts manifest, separate the declared parts with clearance; do not fuse them. Do not simplify the model away.`;
 
 function parseToolArguments(value: string | Record<string, unknown> | undefined) {
   if (!value) return null;
@@ -162,7 +229,81 @@ function parseToolArguments(value: string | Record<string, unknown> | undefined)
   }
 }
 
-function artifactFromRaw(raw: Record<string, unknown>, model: string, started: number): ScadArtifact {
+function parseParts(raw: Record<string, unknown>) {
+  const entries = Array.isArray(raw.parts) ? raw.parts : [];
+  const names = entries.flatMap((entry) => {
+    if (typeof entry === "string") return [entry.trim()];
+    if (entry && typeof entry === "object" && "name" in entry) {
+      const name = (entry as { name?: unknown }).name;
+      return typeof name === "string" ? [name.trim()] : [];
+    }
+    return [];
+  });
+  const unique = [...new Set(names.filter(Boolean))].slice(0, 12);
+  return unique.length ? unique : ["Body"];
+}
+
+function parseJsonObject(text: string) {
+  const clean = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+  const start = clean.indexOf("{");
+  const end = clean.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(clean.slice(start, end + 1)) as Record<string, unknown>;
+  } catch {
+    try {
+      return JSON.parse(jsonrepair(clean.slice(start, end + 1))) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function normalizePlan(text: string, prompt: string): DesignPlan {
+  const raw = parseJsonObject(text) ?? {};
+  const parts = Array.isArray(raw.parts)
+    ? raw.parts.flatMap((entry) => {
+        if (typeof entry === "string") return [entry.trim()];
+        if (entry && typeof entry === "object" && "name" in entry) {
+          const name = (entry as { name?: unknown }).name;
+          return typeof name === "string" ? [name.trim()] : [];
+        }
+        return [];
+      })
+    : [];
+  const lookups = Array.isArray(raw.lookups)
+    ? raw.lookups.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+  const dimensions = Array.isArray(raw.dimensions)
+    ? raw.dimensions.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const item = entry as Record<string, unknown>;
+        if (typeof item.name !== "string" || typeof item.value !== "string") return [];
+        return [{
+          name: item.name,
+          value: item.value,
+          source: typeof item.source === "string" ? item.source : "assumed",
+        }];
+      })
+    : [];
+  return {
+    interpretation:
+      typeof raw.interpretation === "string" && raw.interpretation.trim()
+        ? raw.interpretation.trim().slice(0, 900)
+        : prompt.slice(0, 300),
+    parts: [...new Set(parts.filter(Boolean))].slice(0, 12),
+    lookups: [...new Set(lookups.map((item) => item.trim()))].slice(0, 3),
+    dimensions: dimensions.slice(0, 16),
+    risks: typeof raw.risks === "string" ? raw.risks.trim().slice(0, 500) : "",
+  };
+}
+
+function artifactFromRaw(
+  raw: Record<string, unknown>,
+  model: string,
+  started: number,
+  sources: ScadSource[],
+): ScadArtifact {
   let code = typeof raw.code === "string" ? raw.code : "";
   code = code.trim();
   if (/^```/.test(code)) {
@@ -177,185 +318,239 @@ function artifactFromRaw(raw: Record<string, unknown>, model: string, started: n
       : "OpenSCAD model";
   const message =
     typeof raw.message === "string" && raw.message.trim()
-      ? raw.message.trim().slice(0, 320)
+      ? raw.message.trim().slice(0, 360)
       : "Drafted the model.";
-  return { title, code, message, model, ms: Date.now() - started };
+  return {
+    title,
+    code,
+    message,
+    model,
+    ms: Date.now() - started,
+    parts: parseParts(raw),
+    sources,
+  };
 }
 
-async function callOnce(
+function addSources(target: ScadSource[], results: { title: string; url: string }[]) {
+  for (const result of results) {
+    if (target.length >= 4) return;
+    if (!result.url || target.some((item) => item.url === result.url)) continue;
+    target.push({ title: result.title.slice(0, 90), url: result.url });
+  }
+}
+
+async function callModel(
   model: string,
   messages: ChatMessage[],
   temperature: number,
   signal: AbortSignal,
   sessionId: string,
+  tools: unknown[],
+  maxTokens: number,
 ) {
   if (!API_KEY) throw new ScadError("OPENCODE_GO_API_KEY is not set on the server.", 503);
-  const started = Date.now();
-  const conversation: ChatMessage[] = messages.map((item) => ({ ...item }));
-  let lookups = 0;
-  for (let step = 0; step < 5; step++) {
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    temperature: /kimi/i.test(model) ? 1 : temperature,
+    max_tokens: maxTokens,
+  };
+  if (tools.length) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}/chat/completions`, {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${API_KEY}`,
+        "x-opencode-session": `cadgo-studio-${sessionId}`.slice(0, 120),
+        "x-opencode-client": "cadgo-studio",
+        "User-Agent": "cadgo-studio/0.4",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
     if (signal.aborted) throw new ScadError("Cancelled", 499);
-    const body: Record<string, unknown> = {
-      model,
-      messages: conversation,
-      tools: toolSchema(),
-      tool_choice: "auto",
-      temperature,
-      max_tokens: 12000,
-    };
-    if (/deepseek|glm/i.test(model)) body.thinking = { type: "disabled" };
-    let response: Response;
-    try {
-      response = await fetch(`${BASE_URL}/chat/completions`, {
-        method: "POST",
-        signal,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${API_KEY}`,
-          "x-opencode-session": `cadgo-studio-${sessionId}`.slice(0, 120),
-          "x-opencode-client": "cadgo-studio",
-          "User-Agent": "cadgo-studio/0.2",
-        },
-        body: JSON.stringify(body),
-      });
-    } catch (error) {
-      if (signal.aborted) throw new ScadError("Cancelled", 499);
-      throw new ScadError("The design compiler could not be reached.", 502);
-    }
-    const text = await response.text();
-    let payload: ChatResponse;
-    try {
-      payload = JSON.parse(text) as ChatResponse;
-    } catch {
-      throw new ScadError(`The design compiler returned an unreadable response (${response.status}).`, 502);
-    }
-    if (!response.ok) {
-      const reason = payload.error?.message ?? `HTTP ${response.status}`;
-      if (response.status === 429) throw new ScadError("The design compiler is rate-limited. Try an example.", 429);
-      throw new ScadError(`Design compiler error: ${reason}`, 502);
-    }
-    const choice = payload.choices?.[0];
-    if (!choice) throw new ScadError("The design compiler returned no result.", 502);
-    if (choice.finish_reason === "length") {
-      throw new ScadError("The design compiler ran out of room. Try a simpler part.", 502);
-    }
-    const assistant = choice.message ?? {};
-    const calls = assistant.tool_calls ?? [];
-    const webCalls = calls.filter((call) => call.function?.name === "web_lookup");
-    const specCall = calls.find((call) => call.function?.name === "create_scad");
+    throw new ScadError("The design compiler could not be reached.", 502);
+  }
+  const text = await response.text();
+  let payload: ChatResponse;
+  try {
+    payload = JSON.parse(text) as ChatResponse;
+  } catch {
+    throw new ScadError(`The design compiler returned an unreadable response (${response.status}).`, 502);
+  }
+  if (!response.ok) {
+    const reason = payload.error?.message ?? `HTTP ${response.status}`;
+    if (response.status === 429) throw new ScadError("The design compiler is rate-limited. Try an example.", 429);
+    throw new ScadError(`Design compiler error: ${reason}`, 502);
+  }
+  const choice = payload.choices?.[0];
+  if (!choice) throw new ScadError("The design compiler returned no result.", 502);
+  if (choice.finish_reason === "length") {
+    throw new ScadError("The design compiler ran out of room. Try a simpler assembly.", 502);
+  }
+  return { message: choice.message ?? {}, model };
+}
 
-    if (webCalls.length) {
-      lookups += webCalls.length;
-      if (lookups > 3) throw new ScadError("The design compiler asked for too many web lookups.", 502);
-      conversation.push({
-        role: "assistant",
-        content: assistant.content ?? "",
-        tool_calls: calls,
-      });
-      for (const call of webCalls) {
-        const args = parseToolArguments(call.function?.arguments);
-        const query = typeof args?.query === "string" ? args.query : "";
-        const sourceUrl = typeof args?.url === "string" ? args.url : undefined;
-        const result =
-          query || sourceUrl
-            ? await webLookup(query, sourceUrl)
-            : { query, results: [], error: "Empty lookup query" };
-        conversation.push({
-          role: "tool",
-          tool_call_id: call.id ?? `web-${step}`,
-          content: JSON.stringify(result).slice(0, 7500),
-        });
+async function runModel(
+  messages: ChatMessage[],
+  temperature: number,
+  signal: AbortSignal,
+  sessionId: string,
+  tools: unknown[],
+  maxTokens: number,
+) {
+  try {
+    return await callModel(MODEL, messages, temperature, signal, sessionId, tools, maxTokens);
+  } catch (error) {
+    if (error instanceof ScadError && error.status === 499) throw error;
+    try {
+      return await callModel(FALLBACK_MODEL, messages, temperature, signal, sessionId, tools, maxTokens);
+    } catch {
+      throw error;
+    }
+  }
+}
+
+async function planDesign(prompt: string, sessionId: string, signal: AbortSignal) {
+  const response = await runModel(
+    [
+      { role: "system", content: PLANNER_SYSTEM },
+      { role: "user", content: `BRIEF: ${prompt}\n\nReturn the planning JSON now.` },
+    ],
+    0.2,
+    signal,
+    sessionId,
+    [],
+    3500,
+  );
+  return normalizePlan(response.message.content ?? "", prompt);
+}
+
+function inferLookupQuery(prompt: string) {
+  const metric = prompt.match(/\bM(\d+(?:\.\d+)?)\b/i);
+  if (metric) return `ISO 4762 M${metric[1]} socket head cap screw dimensions`;
+  if (/NEMA\s*\d+/i.test(prompt)) return "NEMA stepper motor mounting hole spacing dimensions";
+  if (/raspberry pi/i.test(prompt)) return "Raspberry Pi mounting hole spacing dimensions";
+  if (/arduino/i.test(prompt)) return "Arduino board mounting hole spacing dimensions";
+  if (/\b(\d{3,4})\s*(?:ZZ|2RS|bearing)\b/i.test(prompt)) return `${prompt.match(/\d{3,4}/)?.[0]} ball bearing dimensions`;
+  return null;
+}
+
+function lookupQueries(prompt: string, plan: DesignPlan) {
+  const queries = [...plan.lookups];
+  if (!queries.length) {
+    const inferred = inferLookupQuery(prompt);
+    if (inferred) queries.push(inferred);
+  }
+  return [...new Set(queries.map((item) => item.trim()).filter(Boolean))].slice(0, 3);
+}
+
+async function researchReferences(queries: string[]) {
+  const sources: ScadSource[] = [];
+  const blocks: string[] = [];
+  const results = await Promise.all(
+    queries.map(async (query) => {
+      try {
+        return await webLookup(query);
+      } catch (error) {
+        return { query, results: [], error: error instanceof Error ? error.message : "Lookup failed" };
       }
+    }),
+  );
+  for (const result of results) {
+    addSources(sources, result.results);
+    if (!result.results.length) {
+      blocks.push(`LOOKUP: ${result.query}\nRESULT: ${result.error ?? "No source found. State the assumption."}`);
       continue;
     }
-
-    if (specCall) {
-      const raw = parseToolArguments(specCall.function?.arguments);
-      if (!raw) throw new ScadError("The design compiler returned malformed code data.", 502);
-      return artifactFromRaw(raw, model, started);
+    for (const item of result.results.slice(0, 2)) {
+      blocks.push(
+        `LOOKUP: ${result.query}\nSOURCE: ${item.title} — ${item.url}\nEXTRACT: ${(item.text ?? item.snippet).slice(0, 1800)}`,
+      );
     }
-
-    if (assistant.content) {
-      const content = assistant.content
-        .trim()
-        .replace(/^```(?:scad|openscad|json)?/i, "")
-        .replace(/```$/, "")
-        .trim();
-      try {
-        const raw = JSON.parse(content) as Record<string, unknown>;
-        return artifactFromRaw(raw, model, started);
-      } catch {
-        if (content.includes("module") || content.includes("difference") || content.includes("union")) {
-          return artifactFromRaw({ title: "OpenSCAD model", code: content, message: "Designed the model." }, model, started);
-        }
-      }
-    }
-    throw new ScadError("The design compiler did not return a model.", 502);
   }
-  throw new ScadError("The design compiler used too many steps.", 502);
+  return { sources, text: blocks.join("\n\n").slice(0, 12000) };
 }
 
-function raceModels(messages: ChatMessage[], temperature: number, sessionId: string) {
-  return new Promise<ScadArtifact>((resolve, reject) => {
-    let settled = false;
-    let primaryAbort: AbortController | null = new AbortController();
-    let fallbackAbort: AbortController | null = null;
-    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
-    let lastError: Error | null = null;
-
-    const finish = (error: Error | null, artifact?: ScadArtifact) => {
-      if (settled) return;
-      settled = true;
-      if (fallbackTimer) clearTimeout(fallbackTimer);
-      primaryAbort?.abort();
-      fallbackAbort?.abort();
-      primaryAbort = null;
-      fallbackAbort = null;
-      if (error || !artifact) reject(error ?? new ScadError("No model was produced.", 502));
-      else resolve(artifact);
-    };
-
-    const startFallback = () => {
-      if (settled || fallbackAbort) return;
-      fallbackAbort = new AbortController();
-      callOnce(FALLBACK_MODEL, messages, temperature, fallbackAbort.signal, sessionId)
-        .then((artifact) => finish(null, artifact))
-        .catch((error) => {
-          if (!settled) finish(error);
-        });
-    };
-
-    callOnce(MODEL, messages, temperature, primaryAbort.signal, sessionId)
-      .then((artifact) => finish(null, artifact))
-      .catch((error) => {
-        if (settled) return;
-        lastError = error;
-        if (!fallbackAbort) {
-          if (fallbackTimer) clearTimeout(fallbackTimer);
-          startFallback();
-        } else {
-          finish(lastError);
-        }
-      });
-
-    fallbackTimer = setTimeout(startFallback, 4000);
-  });
+async function buildArtifact(
+  messages: ChatMessage[],
+  sessionId: string,
+  signal: AbortSignal,
+  sources: ScadSource[],
+  started: number,
+) {
+  const response = await runModel(messages, 0.2, signal, sessionId, [createTool], 20000);
+  const calls = response.message.tool_calls ?? [];
+  const specCall = calls.find((call) => call.function?.name === "create_scad");
+  if (specCall) {
+    const raw = parseToolArguments(specCall.function?.arguments);
+    if (!raw) throw new ScadError("The design compiler returned malformed code data.", 502);
+    return artifactFromRaw(raw, response.model, started, sources);
+  }
+  const content = (response.message.content ?? "")
+    .trim()
+    .replace(/^```(?:scad|openscad|json)?/i, "")
+    .replace(/```$/, "")
+    .trim();
+  if (content) {
+    const raw = parseJsonObject(content);
+    if (raw && typeof raw.code === "string") return artifactFromRaw(raw, response.model, started, sources);
+    if (content.includes("module") || content.includes("difference") || content.includes("union")) {
+      return artifactFromRaw(
+        { title: "OpenSCAD model", code: content, message: "Designed the model." },
+        response.model,
+        started,
+        sources,
+      );
+    }
+  }
+  throw new ScadError("The design compiler did not return a model.", 502);
 }
 
-export async function generateScad(prompt: string, sessionId: string): Promise<ScadArtifact> {
+export async function generateScad(
+  prompt: string,
+  sessionId: string,
+  signal?: AbortSignal,
+): Promise<ScadArtifact> {
   const key = `scad:${prompt.trim().toLowerCase()}`;
   const hit = cache.get(key);
   if (hit) return { ...hit, ms: 0 };
-  const artifact = await raceModels(
+  const started = Date.now();
+  const runSignal = signal ?? new AbortController().signal;
+  const plan = await planDesign(prompt, sessionId, runSignal);
+  const queries = lookupQueries(prompt, plan);
+  const research = queries.length
+    ? await researchReferences(queries)
+    : { sources: [], text: "No external lookup was requested by the plan. Use stated assumptions." };
+  const planBlock = JSON.stringify(
+    {
+      interpretation: plan.interpretation,
+      parts: plan.parts,
+      dimensions: plan.dimensions,
+      lookups: plan.lookups,
+      risks: plan.risks,
+    },
+    null,
+    2,
+  );
+  const artifact = await buildArtifact(
     [
       { role: "system", content: GENERATE_SYSTEM },
       {
         role: "user",
-        content: `BRIEF: ${prompt}\n\nDesign the part now. Call create_scad once with the complete source.`,
+        content: `BRIEF: ${prompt}\n\nAPPROVED PLAN:\n${planBlock}\n\nREFERENCE RESEARCH:\n${research.text}\n\nBuild every planned part as a separate body. Call create_scad once with the complete source and the matching parts manifest.`,
       },
     ],
-    0.35,
     sessionId,
+    runSignal,
+    research.sources,
+    started,
   );
   cache.set(key, artifact);
   if (cache.size > 32) cache.delete(cache.keys().next().value as string);
@@ -365,35 +560,45 @@ export async function generateScad(prompt: string, sessionId: string): Promise<S
 export async function editScad(
   code: string,
   message: string,
+  parts: string[],
   sessionId: string,
+  signal?: AbortSignal,
 ): Promise<ScadArtifact> {
-  return raceModels(
+  const started = Date.now();
+  return buildArtifact(
     [
       { role: "system", content: EDIT_SYSTEM },
       {
         role: "user",
-        content: `CURRENT OPENSCAD SOURCE:\n${code}\n\nUSER REQUEST: ${message}\n\nReturn the complete revised source via create_scad.`,
+        content: `CURRENT PARTS: ${parts.length ? parts.join(", ") : "not declared"}\n\nCURRENT OPENSCAD SOURCE:\n${code}\n\nUSER REQUEST: ${message}\n\nReturn the complete revised source and matching parts manifest via create_scad.`,
       },
     ],
-    0.25,
     sessionId,
+    signal ?? new AbortController().signal,
+    [],
+    started,
   );
 }
 
 export async function repairScad(
   code: string,
   error: string,
+  parts: string[],
   sessionId: string,
+  signal?: AbortSignal,
 ): Promise<ScadArtifact> {
-  return raceModels(
+  const started = Date.now();
+  return buildArtifact(
     [
       { role: "system", content: REPAIR_SYSTEM },
       {
         role: "user",
-        content: `THE SOURCE FAILED TO COMPILE.\n\nCOMPILER LOG:\n${error.slice(0, 4000)}\n\nSOURCE:\n${code.slice(0, 60000)}\n\nReturn the complete corrected source via create_scad.`,
+        content: `DECLARED PARTS: ${parts.length ? parts.join(", ") : "not declared"}\n\nTHE SOURCE FAILED A BUILD CHECK.\n\nCHECK:\n${error.slice(0, 5000)}\n\nSOURCE:\n${code.slice(0, 60000)}\n\nReturn the complete corrected source and matching parts manifest via create_scad.`,
       },
     ],
-    0.15,
     sessionId,
+    signal ?? new AbortController().signal,
+    [],
+    started,
   );
 }

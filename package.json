@@ -36,7 +36,7 @@
     "vitest": "3.2.4"
   },
   "type": "module",
-  "description": "Cadgo — AI mechanism workbench for the Victoria VR AI Builder Hackathon 2026",
+  "description": "Cadgo — AI CAD part studio for the Victoria VR AI Builder Hackathon 2026",
   "engines": {
     "node": ">=20.10"
   },

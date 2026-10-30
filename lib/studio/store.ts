@@ -14,11 +14,17 @@ import { DEFAULT_EXAMPLE, SCAD_EXAMPLES } from "@/lib/scad/examples";
 import type { OrbitView } from "@/lib/view";
 import { useToast } from "@/lib/store/ui";
 
+export type StudioSource = {
+  title: string;
+  url: string;
+};
+
 export type StudioMessage = {
   id: string;
   role: "user" | "ai" | "system";
   text: string;
   note?: string;
+  sources?: StudioSource[];
   time: string;
 };
 
@@ -29,6 +35,8 @@ type ApiArtifact = {
   code: string;
   message: string;
   model?: string;
+  parts?: string[];
+  sources?: StudioSource[];
 };
 
 type CompileOutcome = {
@@ -45,6 +53,7 @@ type StudioState = {
   booted: boolean;
   title: string;
   code: string;
+  parts: string[];
   params: ParameterDef[];
   values: Record<string, ScadParamValue>;
   mesh: ScadMesh | null;
@@ -115,14 +124,22 @@ function sessionId() {
   return value;
 }
 
-function message(role: StudioMessage["role"], text: string, note?: string): StudioMessage {
-  return { id: uid(), role, text, note, time: timeNow() };
+function message(
+  role: StudioMessage["role"],
+  text: string,
+  note?: string,
+  sources?: StudioSource[],
+): StudioMessage {
+  return { id: uid(), role, text, note, sources, time: timeNow() };
 }
 
 function makeModelLabel(model?: string) {
   if (!model) return undefined;
-  if (/glm/i.test(model)) return "GLM fast pass";
-  if (/deepseek/i.test(model)) return "DeepSeek V4.1 Flash";
+  if (/gpt-6/i.test(model)) return "GPT 6 Luna";
+  if (/gpt-5/i.test(model)) return "GPT 5.6 Luna";
+  if (/kimi/i.test(model)) return "Kimi K3.1 Pro";
+  if (/deepseek/i.test(model)) return model.includes("pro") ? "DeepSeek V4 Pro" : "DeepSeek";
+  if (/glm/i.test(model)) return "GLM";
   return model;
 }
 
@@ -160,12 +177,13 @@ async function evaluateCode(code: string): Promise<CompileOutcome> {
 async function repairArtifact(
   code: string,
   error: string,
+  parts: string[],
   sessionIdValue: string,
 ): Promise<ApiArtifact> {
   const response = await fetch("/api/studio/repair", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, error, sessionId: sessionIdValue }),
+    body: JSON.stringify({ code, error, parts, sessionId: sessionIdValue }),
   });
   const payload = await response.json();
   if (!response.ok || !payload.code) {
@@ -176,6 +194,8 @@ async function repairArtifact(
     code: payload.code,
     message: payload.message ?? "Fixed the model.",
     model: payload.model,
+    parts: Array.isArray(payload.parts) ? payload.parts : parts,
+    sources: Array.isArray(payload.sources) ? payload.sources : [],
   };
 }
 
@@ -211,10 +231,36 @@ function changedLineCount(before: string, after: string) {
   return Math.max(a.length, b.length) - previous[b.length];
 }
 
+
+function geometryIssue(outcome: CompileOutcome, parts: string[]) {
+  if (!outcome.ok || !outcome.mesh) {
+    return outcome.error ?? outcome.logs ?? "The kernel could not build this model.";
+  }
+  if (!parts.length) return null;
+  const bodies = outcome.mesh.components;
+  if (bodies !== parts.length) {
+    return `The kernel found ${bodies} connected bod${bodies === 1 ? "y" : "ies"} but the design declares ${parts.length} separate part${parts.length === 1 ? "" : "s"}. Keep every declared part its own watertight body with 0.2-0.8 mm clearance at mating faces; do not union distinct parts. If one part is made of multiple pieces, make it one watertight solid.`;
+  }
+  return null;
+}
+
+function artifactNote(artifact: ApiArtifact, outcome: CompileOutcome, repaired: number) {
+  const label = makeModelLabel(artifact.model) ?? "Design compiler";
+  const partCount = artifact.parts?.length ?? 0;
+  const bodyCount = outcome.mesh?.components ?? 0;
+  const bits = [label];
+  if (partCount) bits.push(`${partCount} part${partCount === 1 ? "" : "s"}`);
+  if (partCount && bodyCount && bodyCount !== partCount) bits.push(`${bodyCount} bodies`);
+  if (artifact.sources?.length) bits.push(`${artifact.sources.length} source${artifact.sources.length === 1 ? "" : "s"}`);
+  if (repaired) bits.push(repaired === 1 ? "quality-repaired" : `quality-repaired ×${repaired}`);
+  return bits.join(" · ");
+}
+
 export const useStudio = create<StudioState>((set, get) => ({
   booted: false,
   title: "New part",
   code: "",
+  parts: [],
   params: [],
   values: {},
   mesh: null,
@@ -265,6 +311,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         title: parsed.t ?? "Shared model",
         code: parsed.c,
         codeDraft: parsed.c,
+        parts: [],
         params: outcome.params,
         values: outcome.values,
         mesh: outcome.mesh,
@@ -290,6 +337,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       title: "New part",
       code: "",
       codeDraft: "",
+      parts: [],
       params: [],
       values: {},
       mesh: null,
@@ -320,6 +368,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       title: name,
       code: clean,
       codeDraft: clean,
+      parts: [],
       prompt: "",
       messages: [...get().messages, message("user", `Imported ${name}.scad`)],
     });
@@ -341,6 +390,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       params: outcome.params,
       values: outcome.values,
       mesh: outcome.mesh,
+      parts: [],
       status: "idle",
       logs: outcome.logs ?? "",
       compileMs: Math.round(outcome.duration ?? 0),
@@ -369,6 +419,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       title: example.title,
       code: example.code,
       codeDraft: example.code,
+      parts: [],
       messages: [...get().messages, message("user", example.prompt), message("ai", `${example.title} loaded from the benchbook.`)],
     });
     const outcome = await evaluateCode(example.code);
@@ -378,6 +429,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         params: outcome.params,
         values: outcome.values,
         mesh: outcome.mesh,
+        parts: [],
         status: "idle",
         compileMs: Math.round(outcome.duration ?? 0),
         logs: outcome.logs ?? "",
@@ -416,21 +468,20 @@ export const useStudio = create<StudioState>((set, get) => ({
         code: payload.code,
         message: payload.message ?? "Drafted the model.",
         model: payload.model,
+        parts: Array.isArray(payload.parts) ? payload.parts : [],
+        sources: Array.isArray(payload.sources) ? payload.sources : [],
       };
       set({ status: "compiling" });
       let outcome = await evaluateCode(artifact.code);
       let repaired = 0;
-      const needsRepair = () =>
-        !outcome.ok || (outcome.mesh?.floating ?? 0) > 0;
-      while (needsRepair() && repaired < 2) {
+      while (geometryIssue(outcome, artifact.parts ?? []) && repaired < 2) {
         if (token !== requestSeq) return;
+        const issue = geometryIssue(outcome, artifact.parts ?? []);
+        if (!issue) break;
         repaired++;
         set({ status: "repairing" });
-        const issue = outcome.ok
-          ? `The mesh has ${outcome.mesh?.floating ?? 0} detached floating solid(s). Connect every solid to the main body, or remove the floating geometry.`
-          : outcome.error ?? outcome.logs ?? "compile failed";
         try {
-          artifact = await repairArtifact(artifact.code, issue, sessionId());
+          artifact = await repairArtifact(artifact.code, issue, artifact.parts ?? [], sessionId());
         } catch (error) {
           throw new Error(error instanceof Error ? error.message : "The repair pass failed");
         }
@@ -445,6 +496,7 @@ export const useStudio = create<StudioState>((set, get) => ({
           code: artifact.code,
           codeDraft: artifact.code,
           title: artifact.title,
+          parts: artifact.parts ?? [],
         });
         set({ messages: [...get().messages, message("system", "The drafter returned code the kernel could not build.")] });
         return;
@@ -453,6 +505,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         title: artifact.title,
         code: artifact.code,
         codeDraft: artifact.code,
+        parts: artifact.parts ?? [],
         params: outcome.params,
         values: outcome.values,
         mesh: outcome.mesh,
@@ -468,7 +521,8 @@ export const useStudio = create<StudioState>((set, get) => ({
           message(
             "ai",
             artifact.message,
-            `${makeModelLabel(artifact.model) ?? "Design compiler"}${repaired ? " · repaired compiler error" : ""}`,
+            artifactNote(artifact, outcome, repaired),
+            artifact.sources,
           ),
         ],
       });
@@ -498,7 +552,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       const response = await fetch("/api/studio/edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, message: text, sessionId: sessionId() }),
+        body: JSON.stringify({ code, message: text, parts: get().parts, sessionId: sessionId() }),
         signal: currentAbort.signal,
       });
       if (token !== requestSeq) return;
@@ -509,19 +563,19 @@ export const useStudio = create<StudioState>((set, get) => ({
         code: payload.code,
         message: payload.message ?? "Revised the model.",
         model: payload.model,
+        parts: Array.isArray(payload.parts) ? payload.parts : get().parts,
+        sources: Array.isArray(payload.sources) ? payload.sources : [],
       };
       set({ status: "compiling" });
       let outcome = await evaluateCode(artifact.code);
       let repaired = 0;
-      const needsRepair = () => !outcome.ok || (outcome.mesh?.floating ?? 0) > 0;
-      while (needsRepair() && repaired < 2) {
+      while (geometryIssue(outcome, artifact.parts ?? []) && repaired < 2) {
         if (token !== requestSeq) return;
+        const issue = geometryIssue(outcome, artifact.parts ?? []);
+        if (!issue) break;
         repaired++;
         set({ status: "repairing" });
-        const issue = outcome.ok
-          ? `The mesh has ${outcome.mesh?.floating ?? 0} detached floating solid(s). Connect every solid to the main body, or remove the floating geometry.`
-          : outcome.error ?? outcome.logs ?? "compile failed";
-        artifact = await repairArtifact(artifact.code, issue, sessionId());
+        artifact = await repairArtifact(artifact.code, issue, artifact.parts ?? [], sessionId());
         outcome = await evaluateCode(artifact.code);
       }
       if (token !== requestSeq) return;
@@ -538,6 +592,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         title: artifact.title,
         code: artifact.code,
         codeDraft: artifact.code,
+        parts: artifact.parts ?? [],
         params: outcome.params,
         values: outcome.values,
         mesh: outcome.mesh,
@@ -552,7 +607,8 @@ export const useStudio = create<StudioState>((set, get) => ({
           message(
             "ai",
             artifact.message,
-            `Edited in place · ${changed} line${changed === 1 ? "" : "s"} changed${repaired ? " · repaired" : ""}`,
+            `Edited in place · ${changed} line${changed === 1 ? "" : "s"} changed · ${artifactNote(artifact, outcome, repaired)}`,
+            artifact.sources,
           ),
         ],
       });
@@ -598,7 +654,7 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   applyCode: async (code) => {
     const seq = ++compileSeq;
-    set({ status: "compiling", error: null, code, codeDraft: code });
+    set({ status: "compiling", error: null, code, codeDraft: code, parts: [] });
     const outcome = await evaluateCode(code);
     if (seq !== compileSeq) return;
     if (!outcome.ok || !outcome.mesh || !outcome.params || !outcome.values) {

@@ -110,6 +110,38 @@ async function safeFetch(url: string): Promise<Response> {
   throw new Error("Too many redirects");
 }
 
+
+async function duckDuckSearch(query: string) {
+  const searchUrl = "https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query);
+  const response = await safeFetch(searchUrl);
+  if (!response.ok) throw new Error(`Web search returned HTTP ${response.status}`);
+  const html = await response.text();
+  const results: WebLookupResult["results"] = [];
+  const anchors = html.matchAll(/class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g);
+  for (const match of anchors) {
+    if (results.length >= 3) break;
+    const href = match[1].replace(/&amp;/g, "&");
+    let url = "";
+    try {
+      const parsed = new URL(href, "https://duckduckgo.com");
+      const target = parsed.searchParams.get("uddg");
+      url = target ? decodeURIComponent(target) : href;
+      if (url.startsWith("//")) url = `https:${url}`;
+      const clean = new URL(url);
+      if (clean.protocol !== "https:" && clean.protocol !== "http:") continue;
+      if (clean.hostname.endsWith("duckduckgo.com")) continue;
+      url = clean.href;
+    } catch {
+      continue;
+    }
+    const title = stripHtml(match[2]);
+    if (!title || !url) continue;
+    results.push({ title, url, snippet: "" });
+  }
+  if (!results.length) throw new Error("No web results found");
+  return results;
+}
+
 async function wikipediaSearch(query: string) {
   const searchUrl =
     "https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&origin=*&srlimit=3&srsearch=" +
@@ -174,15 +206,28 @@ export async function webLookup(query: string, url?: string): Promise<WebLookupR
         text: page.text,
       });
     } else {
-      const hits = await wikipediaSearch(clean);
+      let hits: { title: string; url: string; snippet: string }[] = [];
+      try {
+        hits = await duckDuckSearch(clean);
+      } catch {
+        hits = [];
+      }
+      if (!hits.length) hits = await wikipediaSearch(clean);
       if (!hits.length) throw new Error("No reference pages found");
       for (const hit of hits.slice(0, 2)) {
         let text = hit.snippet;
         try {
-          const page = await wikipediaExtract(hit.title);
+          const page = await fetchReadable(hit.url);
           if (page.text) text = page.text;
         } catch {
-          // Keep the snippet when the extract is unavailable.
+          if (!text && /wikipedia\.org/i.test(hit.url)) {
+            try {
+              const page = await wikipediaExtract(hit.title);
+              if (page.text) text = page.text;
+            } catch {
+              // Keep the search result without an extract.
+            }
+          }
         }
         results.push({ ...hit, text: text.slice(0, 3600) });
       }
