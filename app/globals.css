@@ -3663,3 +3663,19 @@ a {
   padding: 6px 9px;
   font-size: 10px;
 }
+
+@media (max-width: 860px) {
+  .studio-header-actions .btn span,
+  .studio-header-actions .menu summary span {
+    display: none;
+  }
+
+  .studio-badge {
+    display: none;
+  }
+
+  .studio-header {
+    gap: 8px;
+    padding: 0 9px;
+  }
+}

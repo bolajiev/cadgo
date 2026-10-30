@@ -16,7 +16,8 @@ export function StudioParameters() {
   if (!params.length) {
     return (
       <div className="studio-empty-panel">
-        No exposed parameters in this model. Edit the code or ask for dimensions.
+        No model yet. Describe a part or open a bench study; its dimensions will appear here as
+        sliders.
       </div>
     );
   }

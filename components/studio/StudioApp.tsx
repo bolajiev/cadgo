@@ -163,9 +163,13 @@ export function StudioApp() {
           <span className="studio-status mono">{statusLabel(status)}</span>
         </div>
         <div className="studio-header-actions">
-          <a className="studio-lab-link" href="/mechanism">
-            Mechanism lab
-          </a>
+          <button
+            className="btn"
+            onClick={() => window.open(`${window.location.origin}/`, "_blank", "noopener,noreferrer")}
+            title="Open a blank studio in a new page"
+          >
+            <Icon name="plus" /> <span>New page</span>
+          </button>
           <a
             className="icon-btn tooltip"
             href="https://github.com/bolajiev/cadgo"
@@ -176,7 +180,7 @@ export function StudioApp() {
           >
             <Icon name="github" />
           </a>
-          <ExportMenu />
+          {mesh ? <ExportMenu /> : <span className="btn" aria-disabled="true" style={{ opacity: 0.45 }}>Export</span>}
         </div>
       </header>
 
@@ -291,8 +295,10 @@ export function StudioApp() {
           <div className="studio-stage-top">
             <div className="studio-fig">
               <span className="mono studio-fig-label">FIG. 01 / PART</span>
-              <strong>{title}</strong>
-              <span className="mono studio-fig-sub">OpenSCAD · parameters · millimetres</span>
+              <strong>{mesh ? title : "New part"}</strong>
+              <span className="mono studio-fig-sub">
+                {mesh ? "OpenSCAD · parameters · millimetres" : "No model yet · describe it or open a bench study"}
+              </span>
             </div>
             <div className="view-controls">
               <button className={`icon-btn ${view === "iso" ? "active" : ""}`} onClick={() => setView("iso")} aria-label="Isometric view">
@@ -354,12 +360,40 @@ export function StudioApp() {
             </>
           ) : null}
 
-          {status === "booting" && !mesh ? (
+          {!mesh && status === "idle" ? (
+            <div className="studio-empty-state">
+              <div className="studio-empty-card">
+                <span className="eyebrow">New part</span>
+                <h2>A clean sheet.</h2>
+                <p>
+                  Describe a part on the left, or open one of the bench studies. The model, code and
+                  sliders all start empty.
+                </p>
+                <div className="studio-empty-actions">
+                  <button className="btn btn-primary" onClick={() => document.querySelector<HTMLTextAreaElement>("#studio-prompt")?.focus()}>
+                    <Icon name="cursor" /> Write a brief
+                  </button>
+                  <button
+                    className="btn"
+                    onClick={() => window.open(`${window.location.origin}/`, "_blank", "noopener,noreferrer")}
+                  >
+                    <Icon name="plus" /> Open in new page
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {!mesh && (status === "drafting" || status === "compiling" || status === "repairing") ? (
             <div className="studio-veil">
               <div className="studio-loading-card">
-                <span className="eyebrow">CAD kernel</span>
-                <h2>Waking OpenSCAD</h2>
-                <p>Loading the local WebAssembly kernel. This happens once per session.</p>
+                <span className="eyebrow">{status === "drafting" ? "Design compiler" : "Local kernel"}</span>
+                <h2>{status === "drafting" ? "Writing the part" : status === "repairing" ? "Fixing the mesh" : "Compiling locally"}</h2>
+                <p>
+                  {status === "drafting"
+                    ? "DeepSeek is writing OpenSCAD; the local kernel will compile it here."
+                    : "OpenSCAD WebAssembly is waking up. This happens once per page."}
+                </p>
                 <div className="studio-progress">
                   <span />
                 </div>
@@ -404,7 +438,7 @@ export function StudioApp() {
             </div>
           ) : null}
 
-          {!mesh && !booted && status === "error" ? (
+          {!mesh && status === "error" ? (
             <div className="studio-veil">
               <div className="studio-loading-card">
                 <span className="eyebrow">Kernel</span>

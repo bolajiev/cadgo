@@ -1,5 +1,5 @@
-import { CadgoApp } from "@/components/CadgoApp";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <CadgoApp />;
+  redirect("/");
 }

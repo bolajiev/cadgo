@@ -15,6 +15,14 @@ export function StudioCode() {
   const notify = useToast((state) => state.notify);
   const lines = code.split("\n").length;
 
+  if (!code) {
+    return (
+      <div className="studio-empty-panel">
+        No OpenSCAD yet. Generate a part or load a bench study; the complete source will appear here.
+      </div>
+    );
+  }
+
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(code);

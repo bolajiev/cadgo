@@ -1,11 +1,11 @@
 # Demo video — 3 minutes
 
-Target length: **2:45**. Record the production build at 1440×900 or 1920×1080. Pre-warm the studio with the exact prompts before recording. Use the benchbook if a live draft runs long.
+Target length: **2:35**. Record the production build at 1440×900 or 1920×1080. Pre-warm the studio with the exact prompts before recording. Use the benchbook if a live draft runs long.
 
 ## Shot list
 
 **0:00–0:15 — The problem**
-- Open on the part studio with the knurled knob already on the bench.
+- Open the part studio on its blank new-part state. Click **Knurled control knob** to load a bench study.
 - Voice: “Text-to-3D usually stops at a pretty mesh. Real CAD needs editable dimensions, code and a file you can manufacture. Cadgo turns plain language into that.”
 
 **0:15–0:45 — Parameters are real**
@@ -27,11 +27,11 @@ Target length: **2:45**. Record the production build at 1440×900 or 1920×1080.
 - Export **STL**; show the toast. Export **SCAD**. Copy a share link.
 - Voice: “STL for the slicer, SCAD for the source, a share link that carries the code. No account.”
 
-**2:15–2:35 — The mechanism lab**
-- Open **Mechanism lab**. Load the Springline lamp. Drag the shoulder ring; press play; explode.
-- Voice: “For things that move, the mechanism lab adds a joint graph, a motion timeline and a BOM — the same CAD discipline, with working logic.”
+**2:15–2:30 — New page / close**
+- Click **New page**; a blank studio opens in a new tab. Point at the empty stage.
+- Voice: “No starter model, no forced example. A clean sheet every time.”
 
-**2:35–2:45 — Close**
+**2:25–2:35 — Close**
 - Return to the part studio, knob on the bench.
 - Voice: “Cadgo. Describe a part. Get real CAD.”
 - On-screen: repo URL · live demo URL · Victoria VR AI Builder Hackathon 2026.

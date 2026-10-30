@@ -8,7 +8,9 @@ Cadgo is a browser-based AI CAD workbench. A plain-language brief becomes editab
 **Repository:** https://github.com/bolajiev/cadgo  
 **Hackathon:** Victoria VR AI Builder Hackathon 2026 · **AI-assisted 3D editing**
 
-![Cadgo part studio](docs/studio.png)
+The app opens on a **blank new part** — no hardcoded preview. **New page** opens another blank studio in a new tab.
+
+![Cadgo part studio with a bench study loaded](docs/studio.png)
 
 ## What it does
 
@@ -18,7 +20,6 @@ Cadgo is a browser-based AI CAD workbench. A plain-language brief becomes editab
 - **Editable source.** The OpenSCAD panel shows and edits the actual source. Download the `.scad` or the `.stl`.
 - **Fast fallback.** DeepSeek V4.1 Flash is the default design compiler; a GLM-5.3 Flash fast pass can answer first when the primary is slow. The compiler error loop is the quality gate.
 - **Benchbook.** A knurled knob, honeycomb bracket, twisted vase and spur gear load instantly and stay fully parametric.
-- **Mechanism lab.** The original jointed-assembly workbench lives at `/mechanism`: multi-part CadSpecs, real hinges and sliders, motion timelines, exploded views, BOM, STL/GLB and an ink-on-paper plate.
 
 ![Prompt and benchbook](docs/studio-panel.png)
 
@@ -43,8 +44,6 @@ diameter = 42; // [24:70]
 
 Changing a slider rewrites that value in the source and recompiles locally. The source and the sliders can never disagree.
 
-The mechanism lab uses a different engine: a validated CadSpec compiled with Manifold, plus a joint solver for revolute/prismatic joints.
-
 ## Run locally
 
 ```sh
@@ -54,7 +53,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`. The part studio is `/`; the mechanism lab is `/mechanism`.
+Open `http://localhost:3000`. The part studio is `/` and starts on a blank new part — no starter model. Use **New page** or the empty-state button to open a fresh studio in a new tab.
 
 | variable | default | purpose |
 |---|---|---|
@@ -68,7 +67,6 @@ Open `http://localhost:3000`. The part studio is `/`; the mechanism lab is `/mec
 ```sh
 npm test                 # expression, schema, pose and OpenSCAD parameter tests
 npm run typecheck
-npm run check:examples   # compile the four mechanism-lab studies
 npm run build
 ```
 
@@ -78,9 +76,9 @@ npm run build
 2. Open **OpenSCAD** and read the source; click *Edit code* and compile a change.
 3. Prompt: **“A honeycomb angle bracket with 90 mm flanges, 5 mm plate, four M5 holes and rounded corners.”**
 4. Download **STL** and **SCAD** from Export.
-5. Open **Mechanism lab**, drag the lamp’s elbow ring and press play.
+5. Use **New page** to open a blank studio in a new tab.
 
-If a live draft is slow, use the benchbook. The examples are complete OpenSCAD programs, not cached screenshots, and every parameter is live.
+The app opens blank. Loading a bench study or generating a part is an explicit action; the examples are complete OpenSCAD programs, not cached screenshots, and every parameter is live.
 
 ## Limits
 
@@ -88,11 +86,10 @@ If a live draft is slow, use the benchbook. The examples are complete OpenSCAD p
 - The AI can produce a weak design. The compiler, the detached-solid check and the repair loop catch structural failures, not every bad engineering decision.
 - OpenSCAD WASM is a ~9 MB first load. It is cached by the browser; the first compile wakes it.
 - No account or cloud project database. Share links carry the source in the URL fragment.
-- The mechanism lab is a separate, heavier workflow (Manifold + joint solving) and is not required for part editing.
 
 ## Built with
 
-Next.js 16, React 19, React Three Fiber, three.js, **OpenSCAD WebAssembly**, Zustand, Zod, Vercel. The mechanism lab additionally uses manifold-3d. The design compiler uses an OpenAI-compatible endpoint (DeepSeek V4.1 Flash / GLM-5.3 Flash via OpenCode Go).
+Next.js 16, React 19, React Three Fiber, three.js, **OpenSCAD WebAssembly**, Zustand, Zod, Vercel. The design compiler uses an OpenAI-compatible endpoint (DeepSeek V4.1 Flash / GLM-5.3 Flash via OpenCode Go).
 
 The paper-and-ink plate language was informed by the [Anatomy](https://github.com/wheresryan22/anatomy) craft rules. The OpenSCAD WASM distribution and its source offer come from [CADAM](https://github.com/Adam-CAD/CADAM); see [THIRD_PARTY.md](THIRD_PARTY.md).
 

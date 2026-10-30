@@ -194,12 +194,12 @@ function safeName(title: string) {
 
 export const useStudio = create<StudioState>((set, get) => ({
   booted: false,
-  title: DEFAULT_EXAMPLE.title,
-  code: DEFAULT_EXAMPLE.code,
+  title: "New part",
+  code: "",
   params: [],
   values: {},
   mesh: null,
-  status: "booting",
+  status: "idle",
   error: null,
   logs: "",
   compileMs: 0,
@@ -212,7 +212,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   fitKey: 0,
   showEdges: true,
   showGrid: true,
-  codeDraft: DEFAULT_EXAMPLE.code,
+  codeDraft: "",
 
   boot: async () => {
     if (bootedGlobal) return;
@@ -220,34 +220,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (compileTimer) clearTimeout(compileTimer);
     const fromHash = await get().loadFromHash();
     if (fromHash) return;
-    const seq = ++compileSeq;
-    const example = DEFAULT_EXAMPLE;
-    const outcome = await evaluateCode(example.code);
-    if (seq !== compileSeq) return;
-    if (outcome.ok && outcome.mesh && outcome.params && outcome.values) {
-      set({
-        booted: true,
-        title: example.title,
-        code: example.code,
-        codeDraft: example.code,
-        params: outcome.params,
-        values: outcome.values,
-        mesh: outcome.mesh,
-        status: "idle",
-        compileMs: Math.round(outcome.duration ?? 0),
-        logs: outcome.logs ?? "",
-        fitKey: get().fitKey + 1,
-        messages: [message("ai", `${example.title} loaded. Change a dimension or refine it below.`, "CAD kernel ready")],
-      });
-    } else {
-      set({
-        booted: true,
-        status: "error",
-        error: outcome.error ?? "The starter model did not compile.",
-        logs: outcome.logs ?? "",
-        messages: [message("system", "The starter model did not compile. Open an example.")],
-      });
-    }
+    set({ booted: true, status: "idle" });
   },
 
   loadFromHash: async () => {
@@ -260,6 +233,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       const parsed = JSON.parse(raw) as { t?: string; c?: string };
       if (!parsed.c) return false;
       get().setCodeDraft(parsed.c);
+      set({ status: "compiling", error: null });
       const seq = ++compileSeq;
       const outcome = await evaluateCode(parsed.c);
       if (seq !== compileSeq) return false;
@@ -347,6 +321,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         message: payload.message ?? "Drafted the model.",
         model: payload.model,
       };
+      set({ status: "compiling" });
       let outcome = await evaluateCode(artifact.code);
       let repaired = 0;
       const needsRepair = () =>
@@ -439,6 +414,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         message: payload.message ?? "Revised the model.",
         model: payload.model,
       };
+      set({ status: "compiling" });
       let outcome = await evaluateCode(artifact.code);
       let repaired = 0;
       const needsRepair = () => !outcome.ok || (outcome.mesh?.floating ?? 0) > 0;
@@ -572,7 +548,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   setShowGrid: (showGrid) => set({ showGrid }),
 
   exportStl: async () => {
-    const { code, values, title } = get();
+    const { code, values, title, mesh } = get();
+    if (!code || !mesh) return;
     try {
       useToast.getState().notify("Compiling the STL…");
       const stl = await scadClient().exportStl(code, values);
@@ -592,6 +569,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   shareLink: () => {
     if (typeof window === "undefined") return null;
     const { code, title } = get();
+    if (!code) return null;
     const encoded = LZString.compressToEncodedURIComponent(JSON.stringify({ t: title, c: code }));
     return `${window.location.origin}${window.location.pathname}#s=${encoded}`;
   },

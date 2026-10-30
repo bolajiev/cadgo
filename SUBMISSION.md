@@ -1,4 +1,4 @@
-# Cadgo — AI CAD part studio + mechanism lab
+# Cadgo — AI CAD part studio
 
 **Hackathon:** Victoria VR AI Builder Hackathon 2026  
 **Category:** AI-assisted 3D editing  
@@ -6,9 +6,7 @@
 
 ## Short description
 
-Cadgo is a browser-based AI CAD workbench. A plain-language brief becomes editable OpenSCAD source, compiled locally with the OpenSCAD WebAssembly kernel. Parameters rebuild in the browser, the actual source is visible and editable, and every model exports as STL or SCAD. A compiler-error loop and a detached-solid check send real failures back to the model instead of showing a broken result.
-
-The project also keeps a **mechanism lab**: a second workbench for multi-part jointed assemblies with hinges, sliders, motion timelines, exploded views, BOM, STL/GLB export and an ink-on-paper plate.
+Cadgo is a browser-based AI CAD workbench that opens on a blank new part. A plain-language brief becomes editable OpenSCAD source, compiled locally with the OpenSCAD WebAssembly kernel. Parameters rebuild in the browser, the actual source is visible and editable, and every model exports as STL or SCAD. A compiler-error loop and a detached-solid check send real failures back to the model instead of showing a broken result.
 
 ## What was built
 
@@ -19,11 +17,10 @@ The project also keeps a **mechanism lab**: a second workbench for multi-part jo
 - Four complete benchbook studies: knurled knob, honeycomb bracket, twisted hex vase, spur gear.
 - STL / SCAD export and compressed share links.
 - A fast path: DeepSeek V4.1 Flash primary with GLM-5.3 Flash in parallel for latency.
-- Mechanism lab with real joints, drag-to-move, play/scrub, explode, BOM, GLB/STL and a technical plate.
 
 ## How AI is used
 
-The LLM is a **design compiler**, not a mesh generator. It receives the brief, a strict OpenSCAD design contract and worked examples, then returns a complete OpenSCAD program through a tool call. The browser compiles it with OpenSCAD WASM; the compiler log and detected floating solids feed back into a repair pass. The model never executes code on the server. Parameters and direct code edits stay local and deterministic.
+The LLM is a **design compiler**, not a mesh generator. It receives the brief, a strict OpenSCAD design contract and worked examples, then returns a complete OpenSCAD program through a tool call. The browser compiles it with OpenSCAD WASM; the compiler log and detected floating solids feed back into a repair pass. The app opens with no preview or starter solid; a model appears only when the user generates one or explicitly opens a bench study. **New page** opens a fresh blank studio in a new tab. The model never executes code on the server. Parameters and direct code edits stay local and deterministic.
 
 ## Technical notes
 
@@ -32,7 +29,6 @@ The LLM is a **design compiler**, not a mesh generator. It receives the brief, a
 - Customizer-comment parameter extraction; source-preserving parameter updates.
 - OpenCode Go OpenAI-compatible endpoint: DeepSeek V4.1 Flash primary, GLM-5.3 Flash fast pass.
 - Compiler repair, connected-component / AABB floating-solid detection.
-- Mechanism lab: manifold-3d CSG, CadSpec validation, joint solver, STL/GLB, plate compositor.
 - Server-only API key, per-IP rate limits, no account, browser-local share links.
 
 ## Links
