@@ -1,5 +1,5 @@
-import { CadgoApp } from "@/components/CadgoApp";
+import { StudioApp } from "@/components/studio/StudioApp";
 
 export default function Page() {
-  return <CadgoApp />;
+  return <StudioApp />;
 }

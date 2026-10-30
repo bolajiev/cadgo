@@ -139,6 +139,7 @@ export function Topbar({ mode }: { mode: "landing" | "workbench" }) {
       {mode === "landing" ? (
         <>
           <nav className="topnav" aria-label="Sections">
+            <a href="/">Part studio</a>
             <a href="#benchbook">Benchbook</a>
             <a href="#how">How it works</a>
             <a href="https://github.com/bolajiev/cadgo" target="_blank" rel="noreferrer">

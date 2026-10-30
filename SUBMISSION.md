@@ -1,38 +1,39 @@
-# Cadgo — AI mechanism workbench
+# Cadgo — AI CAD part studio + mechanism lab
 
 **Hackathon:** Victoria VR AI Builder Hackathon 2026  
 **Category:** AI-assisted 3D editing  
-**Tagline:** Say it. Shape it. Set it in motion.
+**Tagline:** Describe a part. Get real CAD.
 
 ## Short description
 
-Cadgo turns a plain-language brief into a parametric, jointed 3D assembly that runs in the browser. Instead of generating a static mesh, it produces named parts, millimetre dimensions, materials, a joint graph with limits, and a working demo motion. Users can drag hinges, scrub the motion, edit dimensions locally, refine the design in conversation, cut a hole directly on a face, and export watertight STL/GLB, the editable CadSpec, a technical drawing plate, or a share link.
+Cadgo is a browser-based AI CAD workbench. A plain-language brief becomes editable OpenSCAD source, compiled locally with the OpenSCAD WebAssembly kernel. Parameters rebuild in the browser, the actual source is visible and editable, and every model exports as STL or SCAD. A compiler-error loop and a detached-solid check send real failures back to the model instead of showing a broken result.
 
-The core idea is that the AI writes a **design spec, not geometry or code**. A deterministic Manifold kernel builds the solids; a joint solver poses them; validation and a repair loop keep the result buildable. This makes the output editable and mechanically meaningful, not just visually plausible.
+The project also keeps a **mechanism lab**: a second workbench for multi-part jointed assemblies with hinges, sliders, motion timelines, exploded views, BOM, STL/GLB export and an ink-on-paper plate.
 
 ## What was built
 
-- Natural-language → multi-part assembly with parameters, materials and a joint graph.
-- Live joint manipulation, motion timeline, explode view, part tree and BOM.
-- Local parameter rebuilds (no AI round-trip) and face-level hole cutting.
-- Conversational revisions through complete spec replace-with-validation.
-- STL / GLB / CadSpec / plate PNG export and compressed share links.
-- Four curated mechanism studies that load instantly and remain editable.
-- A distinctive drafting-bench interface with ink-on-paper plate rendering.
+- Prompt → parametric OpenSCAD source → local WASM mesh → interactive 3D.
+- Top-level Customizer parameters exposed as live sliders; slider edits rewrite the source and recompile locally.
+- Visible, manually editable OpenSCAD code panel.
+- Compiler-error repair loop and disconnected/floating-solid repair.
+- Four complete benchbook studies: knurled knob, honeycomb bracket, twisted hex vase, spur gear.
+- STL / SCAD export and compressed share links.
+- A fast path: DeepSeek V4.1 Flash primary with GLM-5.3 Flash in parallel for latency.
+- Mechanism lab with real joints, drag-to-move, play/scrub, explode, BOM, GLB/STL and a technical plate.
 
 ## How AI is used
 
-The LLM is the **design compiler**. It receives the brief, a CadSpec contract and worked examples, then returns a data-only spec through a tool call. The server validates the schema and joint graph, repairs invalid output, and falls back to a second model or a curated study. The LLM never runs code and never touches the kernel directly. In edit mode it receives the current spec and returns a complete revision, preserving ids and unchanged parts. Direct parameter and face edits stay local and deterministic.
+The LLM is a **design compiler**, not a mesh generator. It receives the brief, a strict OpenSCAD design contract and worked examples, then returns a complete OpenSCAD program through a tool call. The browser compiles it with OpenSCAD WASM; the compiler log and detected floating solids feed back into a repair pass. The model never executes code on the server. Parameters and direct code edits stay local and deterministic.
 
 ## Technical notes
 
-- Next.js 16 / React 19 / React Three Fiber viewer.
-- manifold-3d (WASM) in a worker for CSG and watertight mesh generation.
-- Zod schemas, a pure expression evaluator, graph validation, JSON repair, retries.
-- Parametric CSG: box, cylinder, cone, sphere, extrude, revolve, booleans, patterns, bolts.
-- Joint solver: revolute/prismatic/fixed, origin/axis/limits, rest and demo values.
-- STL/GLB generated from the posed meshes; PNG plate composed from the inked render.
-- Server-only API key, per-IP rate limits, no auth, browser-local recents.
+- Next.js 16, React 19, React Three Fiber / three.js.
+- OpenSCAD 2025 WebAssembly in a module worker: STL/OFF generation, source compile, local parameter rebuilds.
+- Customizer-comment parameter extraction; source-preserving parameter updates.
+- OpenCode Go OpenAI-compatible endpoint: DeepSeek V4.1 Flash primary, GLM-5.3 Flash fast pass.
+- Compiler repair, connected-component / AABB floating-solid detection.
+- Mechanism lab: manifold-3d CSG, CadSpec validation, joint solver, STL/GLB, plate compositor.
+- Server-only API key, per-IP rate limits, no account, browser-local share links.
 
 ## Links
 
@@ -42,4 +43,4 @@ The LLM is the **design compiler**. It receives the brief, a CadSpec contract an
 
 ## Credits
 
-Manifold (Apache-2.0), three.js and React Three Fiber (MIT), Next.js (MIT), DeepSeek V4.1 Flash / GLM-5.3 Flash via OpenCode Go. The drafting visual system is informed by the Anatomy skill (MIT). All model renders and studies are generated by Cadgo.
+OpenSCAD / openscad-wasm (GPL-2.0-or-later), CADAM (GPL-3.0) for the WASM distribution and source offer, Manifold (Apache-2.0), three.js / React Three Fiber / Next.js (MIT), DeepSeek V4.1 Flash and GLM-5.3 Flash via OpenCode Go. The drafting visual system is informed by the Anatomy skill (MIT). All model renders and studies are generated by Cadgo.

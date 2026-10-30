@@ -1,118 +1,104 @@
 # Cadgo
 
-**Say it. Shape it. Set it in motion.**
+**Describe a part. Get real CAD.**
 
-Cadgo is a browser-based AI mechanism workbench. Describe a functional object in plain language and it drafts a **parametric, jointed 3D assembly** you can move, edit and export — not a static mesh.
-
-Built for the **Victoria VR AI Builder Hackathon 2026** (category: AI-assisted 3D editing).
+Cadgo is a browser-based AI CAD workbench. A plain-language brief becomes editable **OpenSCAD** source, compiled locally with the OpenSCAD WebAssembly kernel. Parameters rebuild in the browser, the source is visible and editable, and every model exports as STL or SCAD.
 
 **Live demo:** https://cadgo.vercel.app  
-**Repository:** https://github.com/bolajiev/cadgo
+**Repository:** https://github.com/bolajiev/cadgo  
+**Hackathon:** Victoria VR AI Builder Hackathon 2026 · **AI-assisted 3D editing**
 
-![Landing](docs/landing.png)
+![Cadgo part studio](docs/studio.png)
 
 ## What it does
 
-- **Prompt → mechanism.** A brief becomes named parts, millimetre dimensions, materials, a joint graph with limits, and a demo motion.
-- **Working logic, not decoration.** Revolute and prismatic joints move real parts. Drag a joint ring, scrub the timeline, play the fold, or explode the assembly.
-- **Editable after generation.** Parameter sliders rebuild locally. Conversational refinements revise the spec. Click a face to cut a real hole without another AI round-trip.
-- **A real CAD pipeline.** Watertight solids from the Manifold kernel, per-part volume and mass, a bill of materials, and STL / GLB / CadSpec exports.
-- **A drafting plate.** Plate mode draws an ink-on-paper orthographic study with a title block, rendered from the actual model.
-- **Four proven studies.** A springline lamp, a bench vise, a pan-tilt camera head and a monitor arm load instantly from the benchbook.
+- **Prompt → parametric CAD.** Write “a 100 × 60 × 8 mm mounting plate with four 5 mm corner holes and rounded corners.” Cadgo writes OpenSCAD, compiles it in the browser, and exposes its dimensions as sliders.
+- **Local parameter rebuilds.** Move a slider and the model recompiles in the browser. No AI round-trip, no server geometry.
+- **Compiler repair.** If generated code does not compile, the compiler log goes back to the model for a fix. Detached floating solids are detected and repaired too.
+- **Editable source.** The OpenSCAD panel shows and edits the actual source. Download the `.scad` or the `.stl`.
+- **Fast fallback.** DeepSeek V4.1 Flash is the default design compiler; a GLM-5.3 Flash fast pass can answer first when the primary is slow. The compiler error loop is the quality gate.
+- **Benchbook.** A knurled knob, honeycomb bracket, twisted vase and spur gear load instantly and stay fully parametric.
+- **Mechanism lab.** The original jointed-assembly workbench lives at `/mechanism`: multi-part CadSpecs, real hinges and sliders, motion timelines, exploded views, BOM, STL/GLB and an ink-on-paper plate.
 
-![Workbench](docs/workbench.png)
-
-![Plate](docs/plate.png)
+![Prompt and benchbook](docs/studio-panel.png)
 
 ## How it works
 
 ```
-plain-language brief
-        │
-        ▼
-LLM design compiler ──► CadSpec (parts as CSG, parameters, joints, demo)
-        │                 │
-        │                 ├─ Zod schema + graph checks + JSON repair
-        │                 └─ repair loop / curated fallback
-        ▼
-manifold-3d worker ──► watertight meshes • volume • mass • triangles
-        │
-        ▼
-joint solver ──► posed matrices • joint gizmos • motion timeline
-        │
-        ▼
-React Three Fiber scene ──► STL / GLB / plate PNG / share URL
+brief ──► DeepSeek V4.1 Flash ──► OpenSCAD source ──► local OpenSCAD WASM compile
+              │   (GLM fast pass)                         │
+              │                                            ├─ mesh + colours
+              └─► compiler log / detached-part repair ◄────┘
+                                                           │
+                                             parameters ◄──┤
+                                                           └──► STL / SCAD / share
 ```
 
-The model is **DeepSeek V4.1 Flash** through OpenCode Go, with **GLM-5.3 Flash** as a fallback. The LLM writes a data-only `CadSpec` — never executable code. A deterministic compiler turns that spec into geometry; if a draft does not validate or build, Cadgo repairs it and then falls back to a curated study rather than leaving a blank bench.
+The model writes a data-only OpenSCAD program through a tool call. The server never compiles or executes it; the browser does, in a module worker. Parameters are top-level Customizer variables:
 
-Every generated model keeps:
+```scad
+// Overall diameter
+diameter = 42; // [24:70]
+```
 
-- named parts with materials and expressions (`arm_len * 0.6`);
-- a CSG tree per part (boxes, cylinders, revolves, extrusions, patterns, booleans);
-- world-space joints with axes, limits and rest values;
-- a demo keyframe sequence;
-- design notes and a BOM.
+Changing a slider rewrites that value in the source and recompiles locally. The source and the sliders can never disagree.
 
-The core is in [`lib/cad`](lib/cad): [`types.ts`](lib/cad/types.ts), [`engine.ts`](lib/cad/engine.ts), [`pose.ts`](lib/cad/pose.ts), [`validate.ts`](lib/cad/validate.ts). The AI provider and prompts are in [`lib/ai`](lib/ai).
+The mechanism lab uses a different engine: a validated CadSpec compiled with Manifold, plus a joint solver for revolute/prismatic joints.
 
 ## Run locally
 
 ```sh
 npm install
 cp .env.example .env.local
-# put your OpenCode Go key in OPENCODE_GO_API_KEY
+# add OPENCODE_GO_API_KEY
 npm run dev
 ```
 
-Open `http://localhost:3000`.
-
-Environment:
+Open `http://localhost:3000`. The part studio is `/`; the mechanism lab is `/mechanism`.
 
 | variable | default | purpose |
 |---|---|---|
 | `OPENCODE_GO_API_KEY` | — | server-side key; never sent to the browser |
 | `OPENCODE_GO_BASE_URL` | `https://opencode.ai/zen/go/v1` | OpenAI-compatible endpoint |
 | `OPENCODE_GO_MODEL` | `deepseek-v4.1-flash` | primary design compiler |
-| `OPENCODE_GO_FALLBACK_MODEL` | `glm-5.3-flash` | second pass on failure |
-
-The key is used only in `app/api/generate` and `app/api/edit`, with per-IP rate limits and a token cap. The demo also works from the four local benchbook studies if the drafter is unavailable.
+| `OPENCODE_GO_FALLBACK_MODEL` | `glm-5.3-flash` | fast parallel pass / fallback |
 
 ### Checks
 
 ```sh
-npm test                 # expression, schema and pose-solver tests
-npm run check:examples   # compile all four studies through Manifold
+npm test                 # expression, schema, pose and OpenSCAD parameter tests
 npm run typecheck
+npm run check:examples   # compile the four mechanism-lab studies
 npm run build
 ```
 
-## Demo
-
-Open **https://cadgo.vercel.app**, type a brief, or load one of the four benchbook studies. The first live draft uses a large model and usually takes 20–90 seconds; the benchbook is instant and every study remains fully editable.
-
 ## Try this
 
-1. **Springline lamp** — drag the shoulder ring, press play, then change *Upper arm*.
-2. **Bench vise** — press play to close the jaw; select *Lead screw* and drag its slider.
-3. **PT-2 camera head** — pan and tilt; orbit to see the yoke and axle.
-4. **Conversational edit** — load the lamp and ask: *“Widen the base 20% and add a cable hole at the back.”*
-5. **Plate** — press the plate icon, then use **Export → Plate PNG**.
+1. Load the **Knurled control knob** and drag *Overall diameter* / *Height*.
+2. Open **OpenSCAD** and read the source; click *Edit code* and compile a change.
+3. Prompt: **“A honeycomb angle bracket with 90 mm flanges, 5 mm plate, four M5 holes and rounded corners.”**
+4. Download **STL** and **SCAD** from Export.
+5. Open **Mechanism lab**, drag the lamp’s elbow ring and press play.
 
-If a live draft is slow, the loading card offers a proven bench study. The live drafter keeps the same spec pipeline, so the study is still fully editable.
+If a live draft is slow, use the benchbook. The examples are complete OpenSCAD programs, not cached screenshots, and every parameter is live.
 
-## Limitations
+## Limits
 
-- The kernel is a **mesh** kernel (Manifold), not a B-rep kernel. Exports are STL/GLB, not STEP.
-- AI drafts can be mechanically imperfect. The schema, graph validation and repair loop catch structural failures; they do not guarantee a manufacturable design.
-- There is no authentication or cloud project storage. Recent projects are stored in the browser with IndexedDB; share links carry the spec in the URL fragment.
-- Generated assemblies are capped at 14 parts and 14 joints to keep the demo responsive.
+- The part studio exports **STL and SCAD**; it is a mesh/OpenSCAD workflow, not a STEP/B-rep kernel.
+- The AI can produce a weak design. The compiler, the detached-solid check and the repair loop catch structural failures, not every bad engineering decision.
+- OpenSCAD WASM is a ~9 MB first load. It is cached by the browser; the first compile wakes it.
+- No account or cloud project database. Share links carry the source in the URL fragment.
+- The mechanism lab is a separate, heavier workflow (Manifold + joint solving) and is not required for part editing.
 
 ## Built with
 
-Next.js 16, React 19, React Three Fiber, three.js, manifold-3d, Zustand, Zod, Vercel, and an OpenAI-compatible model endpoint (DeepSeek V4.1 Flash / GLM-5.3 Flash via OpenCode Go).
+Next.js 16, React 19, React Three Fiber, three.js, **OpenSCAD WebAssembly**, Zustand, Zod, Vercel. The mechanism lab additionally uses manifold-3d. The design compiler uses an OpenAI-compatible endpoint (DeepSeek V4.1 Flash / GLM-5.3 Flash via OpenCode Go).
 
-The visual system — paper-and-ink plates, technical frames, ruler-marked readouts — was designed with the [Anatomy](https://github.com/wheresryan22/anatomy) craft rules in mind. The hero and study images are renders of Cadgo's own models. Third-party licenses are listed in [THIRD_PARTY.md](THIRD_PARTY.md).
+The paper-and-ink plate language was informed by the [Anatomy](https://github.com/wheresryan22/anatomy) craft rules. The OpenSCAD WASM distribution and its source offer come from [CADAM](https://github.com/Adam-CAD/CADAM); see [THIRD_PARTY.md](THIRD_PARTY.md).
+
+## License
+
+**GPL-3.0.** The app distributes the OpenSCAD WebAssembly build, which is GPL-2.0-or-later; the combined distribution is GPL-3.0. See [LICENSE](LICENSE) and `public/openscad/SOURCE-OFFER.txt`.
 
 ## Submission
 

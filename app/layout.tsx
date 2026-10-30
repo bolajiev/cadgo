@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cadgo — AI mechanism workbench",
+  title: "Cadgo — AI CAD part studio",
   description:
-    "Turn a plain-language brief into a parametric, jointed 3D assembly you can move, edit and export. Built for the Victoria VR AI Builder Hackathon 2026.",
+    "Turn plain language into parametric OpenSCAD parts you can edit, compile and export in the browser. Plus a jointed mechanism lab. Built for the Victoria VR AI Builder Hackathon 2026.",
   openGraph: {
-    title: "Cadgo — AI mechanism workbench",
-    description: "Say it. Shape it. Set it in motion.",
+    title: "Cadgo — AI CAD part studio",
+    description: "Describe a part. Get real CAD.",
     type: "website",
   },
 };

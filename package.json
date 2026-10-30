@@ -39,5 +39,6 @@
   "description": "Cadgo — AI mechanism workbench for the Victoria VR AI Builder Hackathon 2026",
   "engines": {
     "node": ">=20.10"
-  }
+  },
+  "license": "GPL-3.0-only"
 }

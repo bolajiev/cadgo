@@ -107,7 +107,18 @@ const paths: Record<string, React.ReactNode> = {
     />
   ),
   menu: <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />,
+  copy: (
+    <>
+      <rect x="5.5" y="5.5" width="8" height="8" />
+      <path d="M10.5 5.5V2.5h-8v8h3" />
+    </>
+  ),
   cursor: <path d="m3 2 4.8 11 1.5-4.5L13.8 7z" />,
+  grid: (
+    <>
+      <path d="M2.5 2.5h11v11h-11zM2.5 6.2h11M2.5 9.8h11M6.2 2.5v11M9.8 2.5v11" />
+    </>
+  ),
   joint: (
     <>
       <circle cx="8" cy="8" r="3" />

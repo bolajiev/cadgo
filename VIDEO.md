@@ -1,56 +1,50 @@
 # Demo video — 3 minutes
 
-Target length: **2:45**. Record at 1440×900 or 1920×1080, browser zoom 100%. Use the production build, not the dev server. Pre-warm the drafter with the exact prompts before recording; if a live draft runs long, use the cached response or the benchbook.
+Target length: **2:45**. Record the production build at 1440×900 or 1920×1080. Pre-warm the studio with the exact prompts before recording. Use the benchbook if a live draft runs long.
 
 ## Shot list
 
-**0:00–0:20 — The problem**
-- Open on the Cadgo landing page.
-- Voice: “CAD software is built for experts. AI 3D tools can make a pretty mesh, but a mesh does not work. Cadgo generates the parts, the joints, and the logic that makes a mechanism move.”
+**0:00–0:15 — The problem**
+- Open on the part studio with the knurled knob already on the bench.
+- Voice: “Text-to-3D usually stops at a pretty mesh. Real CAD needs editable dimensions, code and a file you can manufacture. Cadgo turns plain language into that.”
 
-**0:20–0:45 — Describe a mechanism**
-- Type: `A compact desk lamp with a heavy round base, two hinged arms, a conical shade and brass joints, 300 mm reach`
-- Press **Draft it**. Show the loading card, elapsed clock and stages for a beat.
-- When the lamp lands, orbit once; let the brass hinges and shade read.
-- Voice: “A plain-language brief becomes a CadSpec: named parts, millimetres, materials, a joint graph and a demo motion. The LLM writes data, never code.”
+**0:15–0:45 — Parameters are real**
+- Drag **Overall diameter** and **Height** on the knob. The part recuts locally; point at the envelope and compile readout.
+- Open the **OpenSCAD** tab. Show the source. Click *Edit code*, change a dimension, compile.
+- Voice: “This is OpenSCAD compiled in the browser. The sliders rewrite the actual source, so the code and the model cannot disagree.”
 
-**0:45–1:20 — It moves**
-- Drag the shoulder joint ring. The arm follows.
-- Click **Play**. Let the fold run for 2–3 seconds.
-- Select **Upper arm** in Parameters and move the slider; the geometry recuts locally. Point at the updated mass/volume.
-- Voice: “This is the part a static generator cannot do. Drag a hinge, scrub a motion, or change a dimension and watch only the geometry recut — no AI round-trip.”
+**0:45–1:25 — Generate a new part**
+- Type: `A 100 x 60 x 8 mm mounting plate with four 5 mm corner holes and rounded corners, one watertight solid`
+- Press **Generate**. Show the busy state.
+- When it lands: orbit; open Parameters; change the corner radius and hole diameter.
+- Voice: “DeepSeek writes a complete OpenSCAD program. The local kernel compiles it. If the code fails, the compiler log goes back to the model for a repair; floating parts get the same treatment.”
 
-**1:20–1:55 — Keep shaping it**
-- Load the lamp (or the camera slider if using the live demo).
-- In the Brief, type: `Widen the base 20% and add a cable hole at the back.` Show the revised model.
-- Select the base, click **Cut a hole**, click the top face, set Ø 8 mm, cut. Show the hole and the new note.
-- Voice: “Conversation changes the spec. Face-level edits are deterministic: a pick, a diameter, a real boolean. The result survives parameter changes and exports.”
+**1:25–1:50 — The benchbook**
+- Click **Honeycomb angle bracket**, then **Twisted hex vase**, then **Spur gear**. Show the parameters changing.
+- Voice: “Four proven studies load instantly. They are real OpenSCAD programs, not screenshots.”
 
-**1:55–2:20 — Take it out**
-- Toggle **Explode**. Let it sit.
-- Toggle **Plate**. Show the ink-on-paper study.
-- Open **Export**; show STL, GLB, CadSpec, Plate PNG and Share. Download the STL (or point at the toast).
-- Voice: “Watertight STL and GLB, the editable CadSpec, a drawing plate, or a share link. The browser is the whole workbench.”
+**1:50–2:15 — Export and share**
+- Export **STL**; show the toast. Export **SCAD**. Copy a share link.
+- Voice: “STL for the slicer, SCAD for the source, a share link that carries the code. No account.”
 
-**2:20–2:35 — The pipeline**
-- Cut to the benchbook / a quick architecture card (optional).
-- Voice: “DeepSeek V4.1 Flash or GLM writes a validated CadSpec. Manifold builds solids. A joint solver poses them. If a draft fails, Cadgo repairs it or falls back to a proven study — the demo never dead-ends.”
-- Show the four benchbook cards.
+**2:15–2:35 — The mechanism lab**
+- Open **Mechanism lab**. Load the Springline lamp. Drag the shoulder ring; press play; explode.
+- Voice: “For things that move, the mechanism lab adds a joint graph, a motion timeline and a BOM — the same CAD discipline, with working logic.”
 
 **2:35–2:45 — Close**
-- Return to the landing title.
-- Voice: “Cadgo. Say it, shape it, set it in motion.”
-- On-screen: https://github.com/bolajiev/cadgo · https://cadgo.vercel.app · “Victoria VR AI Builder Hackathon 2026”.
+- Return to the part studio, knob on the bench.
+- Voice: “Cadgo. Describe a part. Get real CAD.”
+- On-screen: repo URL · live demo URL · Victoria VR AI Builder Hackathon 2026.
 
 ## Prep checklist
 
-- Use the production URL and a clean browser profile; hide bookmarks and dev tools.
-- Warm the cache with the lamp prompt and the edit prompt before recording.
-- Record at 60 fps; the joint motion and plate transitions are the visual moments.
-- Keep the cursor movements slow; pause 0.5 s on each state.
-- Do not show the Next.js dev badge, terminal, or API keys.
-- Export a 1080p MP4 under 3 minutes; verify audio levels and captions.
+- Use the production URL, a clean profile, no dev tools or Next.js badge.
+- Pre-warm the plate prompt before recording; the live model usually answers in 15–40 seconds.
+- Keep the cursor slow; pause on each state.
+- Show the actual OpenSCAD source; do not hide the code.
+- Record a 1080p MP4 under 3 minutes; check audio and captions.
+- Do not show API keys, terminals or `.env.local`.
 
-## Backup flow (if the live drafter is slow)
+## Backup flow
 
-Use the benchbook lamp, then show the same edit and hole flow. The AI generation can be represented by the loading card + the four pre-generated studies; do not fake a live result. The story is the spec, the joints and the deterministic edits.
+If the live drafter is slow, use the benchbook and show the same parameter/code/export flow. Do not fake a generation result.
