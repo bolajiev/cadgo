@@ -19,7 +19,8 @@ The app opens on a **blank new part** — no hardcoded preview. **New page** ope
 - **Local parameter rebuilds.** Move a slider and the model recompiles in the browser. No AI round-trip, no server geometry.
 - **Compiler repair.** If generated code does not compile, the compiler log goes back to the model for a fix. Detached floating solids are detected and repaired too.
 - **Optional web lookup.** For a named standard component where an exact size is missing, the agent can search Wikipedia or fetch an authoritative public page, and must cite it; otherwise it states its assumption.
-- **Editable source.** The source tab shows and edits the actual OpenSCAD. Download the `.scad` or the `.stl`.
+- **Optional inspector.** Dimensions and Source are buttons, not default panels. The stage keeps the space; open the inspector only when you need a slider or the code.
+- **Direct download.** The header's Download button saves the current, edited part as STL. Source export and share links live in Export.
 - **Fast fallback.** DeepSeek V4.1 Flash is the default design compiler; a GLM-5.3 Flash fast pass can answer first when the primary is slow. The compiler error loop is the quality gate.
 - **Benchbook.** A knurled knob, honeycomb bracket, twisted vase and spur gear load instantly and stay fully parametric.
 
@@ -93,9 +94,9 @@ npm run build
 ## Try this
 
 1. Load the **Knurled control knob** and drag *Overall diameter* / *Height*.
-2. Open **OpenSCAD** and read the source; click *Edit code* and compile a change.
+2. Open the optional **Source** inspector, read the code and compile a change. Open **Dimensions** for the sliders.
 3. Prompt: **“A honeycomb angle bracket with 90 mm flanges, 5 mm plate, four M5 holes and rounded corners.”**
-4. Download **STL** and **SCAD** from Export.
+4. Click **Download** for the current STL; use **Export** for SCAD and the share link.
 5. Use **Import .scad** to bring an existing OpenSCAD source; its dimensions become sliders.
 6. Use **New page** to open a blank studio in a new tab.
 
@@ -113,7 +114,7 @@ The app opens blank. Loading a bench study or generating a part is an explicit a
 - **Impact (30%):** turns natural language into an editable, exportable CAD starting point for hardware teams, makers and educators; standard STL/SCAD output fits existing workflows.
 - **Generalizability (25%):** OpenSCAD import, source-preserving parameter extraction and a reusable compile/repair engine apply to arbitrary parametric parts, not just the benchbook.
 - **Technical depth (20%):** local OpenSCAD WebAssembly kernel, module worker, parameter extraction, compiler repair, floating-solid detection, deterministic local rebuilds, binary STL writer, SSRF-guarded reference lookup, tests.
-- **Demo quality (25%):** blank new-part start, opt-in benchbook, one-screen chat → model → parameters → source → export; the chat edits the current part; the shot list is in [VIDEO.md](VIDEO.md).
+- **Demo quality (25%):** blank new-part start, opt-in benchbook, one-screen chat → model → optional dimensions/source → direct STL download; the chat edits the current part; the shot list is in [VIDEO.md](VIDEO.md).
 
 ## Built with
 

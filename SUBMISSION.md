@@ -17,11 +17,11 @@ CAD remains expert software, while most AI 3D tools stop at a mesh. Cadgo gives 
 - Prompt → parametric OpenSCAD source → local WASM mesh → interactive 3D.
 - Chat feedback edits the current source in place; the reply reports changed lines instead of starting over.
 - Top-level Customizer parameters exposed as live "Dimensions" sliders; slider edits rewrite the source and recompile locally.
-- Visible, manually editable "Source" panel.
+- Optional "Dimensions" and "Source" inspector panels; the default stage stays open and uncluttered.
 - Optional reference lookup for named standards when an exact dimension is missing, with public-page fetching and citation.
 - Compiler-error repair loop and disconnected/floating-solid repair.
 - Four complete benchbook studies: knurled knob, honeycomb bracket, twisted hex vase, spur gear.
-- STL / SCAD export and compressed share links.
+- Direct STL download of the current edited part; SCAD export and compressed share links.
 - A fast path: DeepSeek V4.1 Flash primary with GLM-5.3 Flash in parallel for latency.
 
 ## Generalizability
@@ -34,7 +34,7 @@ The LLM is a **design compiler**, not a mesh generator. It receives the brief, a
 
 ## Demo quality
 
-Cadgo opens on a blank new part. The user can type a brief, import a `.scad`, or explicitly load a bench study; New page opens another blank studio in a new tab. The core journey — prompt, model, parameters, source, export — fits on one screen and is designed to be recorded in under three minutes ([VIDEO.md](VIDEO.md)).
+Cadgo opens on a blank new part. The user can type a brief, import a `.scad`, or explicitly load a bench study; New page opens another blank studio in a new tab. The core journey — prompt, model, optional dimensions/source, direct STL download — fits on one screen with the inspector closed by default, and is designed to be recorded in under three minutes ([VIDEO.md](VIDEO.md)).
 
 ## Technical notes
 

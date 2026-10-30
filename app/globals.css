@@ -3887,3 +3887,125 @@ a {
     margin-top: 5px;
   }
 }
+
+.studio-main {
+  grid-template-columns: 340px minmax(0, 1fr);
+  position: relative;
+}
+
+.studio-stage-controls {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.studio-inspect-controls {
+  display: flex;
+  gap: 3px;
+}
+
+.studio-inspect-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 25px;
+  padding: 0 7px;
+  border: 1px solid var(--line-strong);
+  background: rgba(248, 245, 237, 0.82);
+  backdrop-filter: blur(6px);
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 7.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 1px;
+}
+
+.studio-inspect-button:hover:not(:disabled) {
+  background: var(--white);
+  border-color: var(--ink-soft);
+}
+
+.studio-inspect-button.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.studio-inspect-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.studio-inspector {
+  position: absolute;
+  top: 84px;
+  right: 7px;
+  bottom: 7px;
+  width: 352px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  box-shadow: 0 18px 60px rgba(54, 45, 31, 0.2);
+}
+
+.studio-inspector-head {
+  flex: 0 0 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 9px 0 11px;
+  border-bottom: 1px solid var(--line);
+}
+
+.studio-inspector .studio-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.studio-inspector .studio-kernel-strip {
+  flex: 0 0 27px;
+}
+
+@media (max-width: 1120px) {
+  .studio-main {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+
+  .studio-inspector {
+    width: 320px;
+  }
+}
+
+@media (max-width: 860px) {
+  .studio-main {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .studio-inspector {
+    position: fixed;
+    top: auto;
+    left: 7px;
+    right: 7px;
+    bottom: 7px;
+    width: auto;
+    height: min(68vh, 620px);
+    z-index: 100;
+  }
+
+  .studio-stage-controls {
+    gap: 4px;
+  }
+
+  .studio-inspect-button {
+    font-size: 7px;
+  }
+}

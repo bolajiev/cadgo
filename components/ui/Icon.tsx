@@ -114,6 +114,15 @@ const paths: Record<string, React.ReactNode> = {
     </>
   ),
   cursor: <path d="m3 2 4.8 11 1.5-4.5L13.8 7z" />,
+  sliders: (
+    <>
+      <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />
+      <circle cx="5.5" cy="4.5" r="1.4" fill="var(--panel, #fff)" />
+      <circle cx="10.5" cy="8" r="1.4" fill="var(--panel, #fff)" />
+      <circle cx="7" cy="11.5" r="1.4" fill="var(--panel, #fff)" />
+    </>
+  ),
+  code: <path d="m5.5 4.2-3.2 3.8 3.2 3.8M10.5 4.2l3.2 3.8-3.2 3.8M9.3 2.8l-2.6 10.4" />,
   grid: (
     <>
       <path d="M2.5 2.5h11v11h-11zM2.5 6.2h11M2.5 9.8h11M6.2 2.5v11M9.8 2.5v11" />

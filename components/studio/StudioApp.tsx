@@ -107,17 +107,18 @@ export function StudioApp() {
   const params = useStudio((state) => state.params);
   const messages = useStudio((state) => state.messages);
   const newPart = useStudio((state) => state.newPart);
-  const activeTab = useStudio((state) => state.activeTab);
+
   const view = useStudio((state) => state.view);
   const fitKey = useStudio((state) => state.fitKey);
   const showEdges = useStudio((state) => state.showEdges);
   const showGrid = useStudio((state) => state.showGrid);
   const model = useStudio((state) => state.model);
   const shareLink = useStudio((state) => state.shareLink);
+  const exportStl = useStudio((state) => state.exportStl);
   const generate = useStudio((state) => state.generate);
   const refineModel = useStudio((state) => state.refineModel);
   const loadExample = useStudio((state) => state.loadExample);
-  const setActiveTab = useStudio((state) => state.setActiveTab);
+
   const setView = useStudio((state) => state.setView);
   const fit = useStudio((state) => state.fit);
   const setShowEdges = useStudio((state) => state.setShowEdges);
@@ -126,6 +127,7 @@ export function StudioApp() {
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [chatText, setChatText] = useState("");
+  const [inspector, setInspector] = useState<"dimensions" | "source" | null>(null);
   const importScad = useStudio((state) => state.importScad);
 
   const openImporter = () => fileRef.current?.click();
@@ -202,6 +204,10 @@ export function StudioApp() {
           >
             <Icon name="plus" /> <span>New page</span>
           </button>
+          <button className="btn" disabled={!mesh} onClick={() => exportStl()} title="Download the current part as STL">
+            <Icon name="download" /> <span>Download</span>
+          </button>
+          {mesh ? <ExportMenu /> : <span className="btn" aria-disabled="true" style={{ opacity: 0.45 }}>Export</span>}
           <a
             className="icon-btn tooltip"
             href="https://github.com/bolajiev/cadgo"
@@ -212,7 +218,6 @@ export function StudioApp() {
           >
             <Icon name="github" />
           </a>
-          {mesh ? <ExportMenu /> : <span className="btn" aria-disabled="true" style={{ opacity: 0.45 }}>Export</span>}
         </div>
       </header>
 
@@ -245,7 +250,7 @@ export function StudioApp() {
               <button className="studio-import" onClick={openImporter} disabled={busy}>
                 <Icon name="folder" size={11} /> Import .scad
               </button>
-              <button className="studio-import" onClick={() => newPart()} disabled={busy}>
+              <button className="studio-import" onClick={() => { newPart(); setInspector(null); }} disabled={busy}>
                 <Icon name="plus" size={11} /> New part
               </button>
               <input
@@ -345,38 +350,56 @@ export function StudioApp() {
               <span className="mono studio-fig-label">FIG. 01 / PART</span>
               <strong>{mesh ? title : "New part"}</strong>
               <span className="mono studio-fig-sub">
-                {mesh ? "OpenSCAD · parameters · millimetres" : "No model yet · describe it or open a bench study"}
+                {mesh ? "Parametric solid · local kernel · millimetres" : "No model yet · describe it or open a bench study"}
               </span>
             </div>
-            <div className="view-controls">
-              <button className={`icon-btn ${view === "iso" ? "active" : ""}`} onClick={() => setView("iso")} aria-label="Isometric view">
-                ISO
-              </button>
-              <button className={`icon-btn ${view === "front" ? "active" : ""}`} onClick={() => setView("front")} aria-label="Front view">
-                FR
-              </button>
-              <button className={`icon-btn ${view === "top" ? "active" : ""}`} onClick={() => setView("top")} aria-label="Top view">
-                TP
-              </button>
-              <button className="icon-btn tooltip" data-tip="Fit" onClick={fit} aria-label="Fit view">
-                <Icon name="fit" />
-              </button>
-              <button
-                className={`icon-btn tooltip ${showGrid ? "active" : ""}`}
-                data-tip="Grid"
-                onClick={() => setShowGrid(!showGrid)}
-                aria-label="Toggle grid"
-              >
-                <Icon name="grid" />
-              </button>
-              <button
-                className={`icon-btn tooltip ${showEdges ? "active" : ""}`}
-                data-tip="Ink edges"
-                onClick={() => setShowEdges(!showEdges)}
-                aria-label="Toggle edges"
-              >
-                <Icon name="layers" />
-              </button>
+            <div className="studio-stage-controls">
+              <div className="view-controls">
+                <button className={`icon-btn ${view === "iso" ? "active" : ""}`} onClick={() => setView("iso")} aria-label="Isometric view">
+                  ISO
+                </button>
+                <button className={`icon-btn ${view === "front" ? "active" : ""}`} onClick={() => setView("front")} aria-label="Front view">
+                  FR
+                </button>
+                <button className={`icon-btn ${view === "top" ? "active" : ""}`} onClick={() => setView("top")} aria-label="Top view">
+                  TP
+                </button>
+                <button className="icon-btn tooltip" data-tip="Fit" onClick={fit} aria-label="Fit view">
+                  <Icon name="fit" />
+                </button>
+                <button
+                  className={`icon-btn tooltip ${showGrid ? "active" : ""}`}
+                  data-tip="Grid"
+                  onClick={() => setShowGrid(!showGrid)}
+                  aria-label="Toggle grid"
+                >
+                  <Icon name="grid" />
+                </button>
+                <button
+                  className={`icon-btn tooltip ${showEdges ? "active" : ""}`}
+                  data-tip="Ink edges"
+                  onClick={() => setShowEdges(!showEdges)}
+                  aria-label="Toggle edges"
+                >
+                  <Icon name="layers" />
+                </button>
+              </div>
+              <div className="studio-inspect-controls">
+                <button
+                  className={`studio-inspect-button ${inspector === "dimensions" ? "active" : ""}`}
+                  disabled={!mesh}
+                  onClick={() => setInspector(inspector === "dimensions" ? null : "dimensions")}
+                >
+                  <Icon name="sliders" size={12} /> Dimensions
+                </button>
+                <button
+                  className={`studio-inspect-button ${inspector === "source" ? "active" : ""}`}
+                  disabled={!code}
+                  onClick={() => setInspector(inspector === "source" ? null : "source")}
+                >
+                  <Icon name="code" size={12} /> Source
+                </button>
+              </div>
             </div>
           </div>
 
@@ -517,35 +540,31 @@ export function StudioApp() {
           <span className="plate-corner br" />
         </section>
 
-        <aside className="studio-right">
-          <div className="studio-tabs">
-            <button
-              className={`studio-tab ${activeTab === "parameters" ? "active" : ""}`}
-              onClick={() => setActiveTab("parameters")}
-            >
-              Dimensions <span className="mono">{params.length}</span>
-            </button>
-            <button
-              className={`studio-tab ${activeTab === "code" ? "active" : ""}`}
-              onClick={() => setActiveTab("code")}
-            >
-              Source
-            </button>
-          </div>
-          <div className="studio-tab-purpose">
-            {activeTab === "parameters"
-              ? "Live dimensions — local rebuilds, no AI"
-              : "The actual OpenSCAD — inspect, edit, compile"}
-          </div>
-          <div className="studio-panel-body">
-            {activeTab === "parameters" ? <StudioParameters /> : <StudioCode />}
-          </div>
-          <div className="studio-kernel-strip">
-            <span className="status-dot" />
-            <span className="mono">OpenSCAD 2025.03 · manifold</span>
-            <span className="mono">{mesh ? `${formatNumber(mesh.triangles)} tris` : "—"}</span>
-          </div>
-        </aside>
+        {inspector ? (
+          <aside className="studio-inspector">
+            <div className="studio-inspector-head">
+              <span className="panel-label">
+                {inspector === "dimensions" ? "Dimensions" : "Source"}
+              </span>
+              <button className="icon-btn" onClick={() => setInspector(null)} aria-label="Close inspector">
+                <Icon name="close" />
+              </button>
+            </div>
+            <div className="studio-tab-purpose">
+              {inspector === "dimensions"
+                ? "Live dimensions — local rebuilds, no AI"
+                : "The actual OpenSCAD — inspect, edit, compile"}
+            </div>
+            <div className="studio-panel-body">
+              {inspector === "dimensions" ? <StudioParameters /> : <StudioCode />}
+            </div>
+            <div className="studio-kernel-strip">
+              <span className="status-dot" />
+              <span className="mono">OpenSCAD 2025.03 · manifold</span>
+              <span className="mono">{mesh ? `${formatNumber(mesh.triangles)} tris` : "—"}</span>
+            </div>
+          </aside>
+        ) : null}
       </main>
 
       <footer className="studio-statusbar">

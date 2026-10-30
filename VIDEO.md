@@ -9,14 +9,14 @@ Target length: **2:35**. Record the production build at 1440×900 or 1920×1080.
 - Voice: “Text-to-3D usually stops at a pretty mesh. Real CAD needs editable dimensions, code and a file you can manufacture. Cadgo turns plain language into that.”
 
 **0:15–0:45 — Parameters are real**
-- Drag **Overall diameter** and **Height** on the knob. The part recuts locally; point at the envelope and compile readout.
-- Open the **Source** tab. Show the source. Click *Edit code*, change a dimension, compile.
+- Open **Dimensions** (optional button). Drag **Overall diameter** and **Height**; the part recuts locally. Point at the envelope and compile readout.
+- Optionally open **Source** briefly to show the actual OpenSCAD; close it. Click *Edit code*, change a dimension, compile.
 - Voice: “This is OpenSCAD compiled in the browser. The sliders rewrite the actual source, so the code and the model cannot disagree.”
 
 **0:45–1:10 — Generate a new part**
 - Type: `A 100 x 60 x 8 mm mounting plate with four 5 mm corner holes and rounded corners, one watertight solid`
 - Press **Generate**. Show the busy state.
-- When it lands: orbit; open **Dimensions**; change the corner radius and hole diameter.
+- When it lands: orbit; open **Dimensions** (optional); change the corner radius and hole diameter.
 - Voice: “DeepSeek writes a complete OpenSCAD program. The local kernel compiles it. If the code fails, the compiler log goes back to the model for a repair; floating parts get the same treatment.”
 
 **1:10–1:35 — Chat to edit**
@@ -29,8 +29,8 @@ Target length: **2:35**. Record the production build at 1440×900 or 1920×1080.
 - Voice: “Four proven studies load instantly. They are real OpenSCAD programs, not screenshots. Named standards can trigger a guarded reference lookup for missing dimensions.”
 
 **1:50–2:10 — Export and share**
-- Export **STL**; show the toast. Export **SCAD**. Copy a share link.
-- Voice: “STL for the slicer, SCAD for the source, a share link that carries the code. No account.”
+- Click **Download** (STL) in the header; show the toast. Open **Export** for SCAD and the share link.
+- Voice: “The header download gives the edited part as STL. The optional export also carries the source and a share link. No account.”
 
 **2:10–2:25 — Bring your own source**
 - Click **Import .scad** and load one of the benchbook files (or paste source in the code tab); show the dimensions becoming sliders.
