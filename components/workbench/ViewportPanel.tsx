@@ -246,7 +246,7 @@ export function ViewportPanel() {
                 ))}
               </div>
               <p className="loading-note">
-                Complex briefs take 20–60 seconds. The bench stays live; you can load a proven study
+                Complex briefs take 20–90 seconds. The bench stays live; you can load a proven study
                 instead.
               </p>
               <button

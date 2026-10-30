@@ -89,7 +89,7 @@ npm run build
 
 ## Demo
 
-Open **https://cadgo.vercel.app**, type a brief, or load one of the four benchbook studies. The first live draft uses a large model and usually takes 20–50 seconds; the benchbook is instant and every study remains fully editable.
+Open **https://cadgo.vercel.app**, type a brief, or load one of the four benchbook studies. The first live draft uses a large model and usually takes 20–90 seconds; the benchbook is instant and every study remains fully editable.
 
 ## Try this
 
