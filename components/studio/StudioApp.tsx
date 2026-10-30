@@ -114,6 +114,7 @@ export function StudioApp() {
   const showEdges = useStudio((state) => state.showEdges);
   const showGrid = useStudio((state) => state.showGrid);
   const model = useStudio((state) => state.model);
+  const shareLink = useStudio((state) => state.shareLink);
   const setPrompt = useStudio((state) => state.setPrompt);
   const setRefine = useStudio((state) => state.setRefine);
   const generate = useStudio((state) => state.generate);
@@ -163,6 +164,17 @@ export function StudioApp() {
           <span className="studio-status mono">{statusLabel(status)}</span>
         </div>
         <div className="studio-header-actions">
+          <button
+            className="icon-btn tooltip"
+            data-tip="Open this part in a new page"
+            aria-label="Open this part in a new page"
+            onClick={() => {
+              const link = shareLink();
+              window.open(link ?? `${window.location.origin}/`, "_blank", "noopener,noreferrer");
+            }}
+          >
+            <Icon name="arrow" />
+          </button>
           <button
             className="btn"
             onClick={() => window.open(`${window.location.origin}/`, "_blank", "noopener,noreferrer")}
