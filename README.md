@@ -10,7 +10,7 @@ Cadgo is a browser-based AI CAD workbench. A plain-language brief becomes editab
 
 The app opens on a **blank new part** — no hardcoded preview. **New page** opens another blank studio in a new tab.
 
-![Cadgo part studio with a bench study loaded](docs/studio.png)
+![Cadgo part studio with a bench study loaded; Dimensions and Source stay optional](docs/studio.png)
 
 ## What it does
 
@@ -24,7 +24,7 @@ The app opens on a **blank new part** — no hardcoded preview. **New page** ope
 - **Fast fallback.** DeepSeek V4.1 Flash is the default design compiler; a GLM-5.3 Flash fast pass can answer first when the primary is slow. The compiler error loop is the quality gate.
 - **Benchbook.** A knurled knob, honeycomb bracket, twisted vase and spur gear load instantly and stay fully parametric.
 
-![Prompt and benchbook](docs/studio-panel.png)
+![The blank new-part state, prompt composer and benchbook entry point](docs/studio-panel.png)
 
 ## Why it matters
 

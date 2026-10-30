@@ -267,7 +267,9 @@ export function StudioApp() {
             </div>
 
             <div className="studio-impact-line">
-              For hardware teams, makers and educators. Keep chatting to refine the same part.
+              {code
+                ? "Chat edits this part in place. Every change stays local and reports the changed lines."
+                : "Plain language in, parametric solid out. Dimensions stay live; source stays optional."}
             </div>
 
             <div className="studio-messages" ref={messagesRef}>
@@ -437,13 +439,13 @@ export function StudioApp() {
                 <span className="eyebrow">New part</span>
                 <h2>A clean sheet.</h2>
                 <p>
-                  Describe a part and get editable OpenSCAD with real dimensions, or import a
-                  <strong> .scad</strong> you already have. The model, code and sliders start empty.
+                  Describe a part and get an editable parametric solid with real dimensions, or
+                  bring an existing<strong> .scad</strong>. The model and dimensions start empty.
                 </p>
                 <div className="studio-empty-steps">
                   <span><b>01</b> Describe or import</span>
                   <span><b>02</b> Compile locally</span>
-                  <span><b>03</b> Tune params / code</span>
+                  <span><b>03</b> Tune dimensions</span>
                 </div>
                 <div className="studio-empty-actions">
                   <button className="btn btn-primary" onClick={() => composerRef.current?.focus()}>
