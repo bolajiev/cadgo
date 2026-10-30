@@ -23,6 +23,24 @@ The app opens on a **blank new part** — no hardcoded preview. **New page** ope
 
 ![Prompt and benchbook](docs/studio-panel.png)
 
+## Why it matters
+
+CAD is still expert software. AI 3D tools usually return a pretty mesh that cannot be dimensioned, edited or manufactured. Cadgo returns the thing a hardware team actually needs: **editable source, named dimensions, a local kernel and a manufacturable export**.
+
+- **Who benefits:** hardware teams prototyping fixtures and brackets, makers without CAD training, educators teaching parametric design, and engineers who want a fast first draft they can take into their real toolchain.
+- **Why now:** browser WebAssembly makes a real CAD kernel local and private; LLMs are now good at writing OpenSCAD; the missing piece was a reliable design-spec → compile → repair loop. That is what Cadgo adds.
+- **Adoption path:** the output is standard `.scad` and `.stl`, not proprietary state. A team can adopt it beside an existing CAD workflow on day one.
+
+## Beyond the demo
+
+The engine is not tied to the four studies.
+
+- **Bring your own source:** import any `.scad`; top-level dimensions become sliders immediately.
+- **Bring your own data:** the OpenSCAD source is visible and editable; the generated program is the artifact, not hidden model state.
+- **Reusable compiler loop:** the same parameter extractor, compiler-error repair, floating-solid check and local worker can sit behind any CAD UI, API or classroom tool.
+- **Any part, not one niche:** the benchbook spans a knob, a bracket, a vase and a gear; the prompt path is not limited to those categories.
+- **Export:** `.stl` for printing and `.scad` for the source; no lock-in.
+
 ## How it works
 
 ```
@@ -76,7 +94,8 @@ npm run build
 2. Open **OpenSCAD** and read the source; click *Edit code* and compile a change.
 3. Prompt: **“A honeycomb angle bracket with 90 mm flanges, 5 mm plate, four M5 holes and rounded corners.”**
 4. Download **STL** and **SCAD** from Export.
-5. Use **New page** to open a blank studio in a new tab.
+5. Use **Import .scad** to bring an existing OpenSCAD source; its dimensions become sliders.
+6. Use **New page** to open a blank studio in a new tab.
 
 The app opens blank. Loading a bench study or generating a part is an explicit action; the examples are complete OpenSCAD programs, not cached screenshots, and every parameter is live.
 
@@ -86,6 +105,13 @@ The app opens blank. Loading a bench study or generating a part is an explicit a
 - The AI can produce a weak design. The compiler, the detached-solid check and the repair loop catch structural failures, not every bad engineering decision.
 - OpenSCAD WASM is a ~9 MB first load. It is cached by the browser; the first compile wakes it.
 - No account or cloud project database. Share links carry the source in the URL fragment.
+
+## Judging alignment
+
+- **Impact (30%):** turns natural language into an editable, exportable CAD starting point for hardware teams, makers and educators; standard STL/SCAD output fits existing workflows.
+- **Generalizability (25%):** OpenSCAD import, source-preserving parameter extraction and a reusable compile/repair engine apply to arbitrary parametric parts, not just the benchbook.
+- **Technical depth (20%):** local OpenSCAD WebAssembly kernel, module worker, parameter AST/extraction, compiler repair, floating-solid detection, deterministic local rebuilds, binary STL writer, tests.
+- **Demo quality (25%):** blank new-part start, opt-in benchbook, one-screen prompt → model → parameters → code → export; the under-three-minute shot list is in [VIDEO.md](VIDEO.md).
 
 ## Built with
 

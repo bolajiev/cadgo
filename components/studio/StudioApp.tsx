@@ -126,6 +126,19 @@ export function StudioApp() {
   const setShowEdges = useStudio((state) => state.setShowEdges);
   const setShowGrid = useStudio((state) => state.setShowGrid);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const importScad = useStudio((state) => state.importScad);
+
+  const openImporter = () => fileRef.current?.click();
+  const importFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 240000) {
+      useToast.getState().notify("OpenSCAD source must be under 240 KB", "accent");
+      return;
+    }
+    const text = await file.text();
+    await importScad(text, file.name);
+  };
 
   useEffect(() => {
     boot();
@@ -225,6 +238,23 @@ export function StudioApp() {
               <button className="draft-btn" onClick={() => generate()} disabled={!canGenerate}>
                 {draft ? "Drafting…" : "Generate"} <Icon name="arrow" />
               </button>
+            </div>
+            <div className="studio-import-row">
+              <button className="studio-import" onClick={openImporter} disabled={draft}>
+                <Icon name="folder" size={11} /> Import .scad
+              </button>
+              <span className="mono studio-hint">bring your own source · parameters extracted</span>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".scad,text/plain"
+                className="studio-file-input"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  importFile(file);
+                }}
+              />
             </div>
             <div className="studio-examples">
               {SCAD_EXAMPLES.map((example, index) => (
@@ -378,18 +408,26 @@ export function StudioApp() {
                 <span className="eyebrow">New part</span>
                 <h2>A clean sheet.</h2>
                 <p>
-                  Describe a part on the left, or open one of the bench studies. The model, code and
-                  sliders all start empty.
+                  Describe a part and get editable OpenSCAD with real dimensions, or import a
+                  <strong> .scad</strong> you already have. The model, code and sliders start empty.
                 </p>
+                <div className="studio-empty-steps">
+                  <span><b>01</b> Describe or import</span>
+                  <span><b>02</b> Compile locally</span>
+                  <span><b>03</b> Tune params / code</span>
+                </div>
                 <div className="studio-empty-actions">
                   <button className="btn btn-primary" onClick={() => document.querySelector<HTMLTextAreaElement>("#studio-prompt")?.focus()}>
                     <Icon name="cursor" /> Write a brief
+                  </button>
+                  <button className="btn" onClick={openImporter}>
+                    <Icon name="folder" /> Import .scad
                   </button>
                   <button
                     className="btn"
                     onClick={() => window.open(`${window.location.origin}/`, "_blank", "noopener,noreferrer")}
                   >
-                    <Icon name="plus" /> Open in new page
+                    <Icon name="plus" /> New page
                   </button>
                 </div>
               </div>

@@ -65,6 +65,7 @@ type StudioState = {
   boot: () => Promise<void>;
   loadFromHash: () => Promise<boolean>;
   loadExample: (id: string) => Promise<void>;
+  importScad: (code: string, title?: string) => Promise<void>;
   generate: (prompt?: string) => Promise<void>;
   refineModel: (message?: string) => Promise<void>;
   setPrompt: (value: string) => void;
@@ -259,6 +260,57 @@ export const useStudio = create<StudioState>((set, get) => ({
     } catch {
       return false;
     }
+  },
+
+  importScad: async (code, title) => {
+    const clean = code.slice(0, 200000).trim();
+    if (!clean) return;
+    requestSeq++;
+    currentAbort?.abort();
+    currentAbort = null;
+    const seq = ++compileSeq;
+    const name = (title ?? "Imported part").replace(/\.scad$/i, "").slice(0, 80);
+    set({
+      status: "compiling",
+      error: null,
+      title: name,
+      code: clean,
+      codeDraft: clean,
+      prompt: "",
+      messages: [...get().messages, message("user", `Imported ${name}.scad`)],
+    });
+    const outcome = await evaluateCode(clean);
+    if (seq !== compileSeq) return;
+    if (!outcome.ok || !outcome.mesh || !outcome.params || !outcome.values) {
+      set({
+        status: "error",
+        error: outcome.error ?? "The imported source did not compile.",
+        logs: outcome.logs ?? "",
+        messages: [
+          ...get().messages,
+          message("system", "Imported source did not compile. Open the OpenSCAD tab and fix it, or ask Cadgo for a repair."),
+        ],
+      });
+      return;
+    }
+    set({
+      params: outcome.params,
+      values: outcome.values,
+      mesh: outcome.mesh,
+      status: "idle",
+      logs: outcome.logs ?? "",
+      compileMs: Math.round(outcome.duration ?? 0),
+      activeTab: "parameters",
+      fitKey: get().fitKey + 1,
+      messages: [
+        ...get().messages,
+        message(
+          "ai",
+          `Imported and compiled ${name}.scad. The top-level dimensions are now sliders.`,
+          "Bring your own OpenSCAD",
+        ),
+      ],
+    });
   },
 
   loadExample: async (id) => {

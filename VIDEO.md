@@ -1,6 +1,6 @@
 # Demo video — 3 minutes
 
-Target length: **2:35**. Record the production build at 1440×900 or 1920×1080. Pre-warm the studio with the exact prompts before recording. Use the benchbook if a live draft runs long.
+Target length: **2:40**. Record the production build at 1440×900 or 1920×1080. Pre-warm the studio with the exact prompts before recording. Use the benchbook if a live draft runs long.
 
 ## Shot list
 
@@ -27,13 +27,13 @@ Target length: **2:35**. Record the production build at 1440×900 or 1920×1080.
 - Export **STL**; show the toast. Export **SCAD**. Copy a share link.
 - Voice: “STL for the slicer, SCAD for the source, a share link that carries the code. No account.”
 
-**2:15–2:30 — New page / close**
-- Click **New page**; a blank studio opens in a new tab. Point at the empty stage.
-- Voice: “No starter model, no forced example. A clean sheet every time.”
+**2:15–2:30 — Bring your own source**
+- Click **Import .scad** and load one of the benchbook files (or paste source in the code tab); show the dimensions becoming sliders.
+- Voice: “The engine is not tied to these demos. Any OpenSCAD source you already have becomes parametric.”
 
-**2:25–2:35 — Close**
-- Return to the part studio, knob on the bench.
-- Voice: “Cadgo. Describe a part. Get real CAD.”
+**2:30–2:40 — New page / close**
+- Click **New page**; a blank studio opens in a new tab. Point at the empty stage.
+- Voice: “No starter model, no forced example. A clean sheet every time. Cadgo — describe a part, get real CAD.”
 - On-screen: repo URL · live demo URL · Victoria VR AI Builder Hackathon 2026.
 
 ## Prep checklist

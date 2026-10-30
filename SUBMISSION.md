@@ -8,6 +8,10 @@
 
 Cadgo is a browser-based AI CAD workbench that opens on a blank new part. A plain-language brief becomes editable OpenSCAD source, compiled locally with the OpenSCAD WebAssembly kernel. Parameters rebuild in the browser, the actual source is visible and editable, and every model exports as STL or SCAD. A compiler-error loop and a detached-solid check send real failures back to the model instead of showing a broken result.
 
+## Impact
+
+CAD remains expert software, while most AI 3D tools stop at a mesh. Cadgo gives hardware teams, makers and educators a parametric starting point with editable source, real dimensions and STL/SCAD exports — a first draft that can enter a real workflow rather than a pretty dead end. The blank new-part state is deliberate: no forced demo model, no fake preview.
+
 ## What was built
 
 - Prompt → parametric OpenSCAD source → local WASM mesh → interactive 3D.
@@ -18,9 +22,17 @@ Cadgo is a browser-based AI CAD workbench that opens on a blank new part. A plai
 - STL / SCAD export and compressed share links.
 - A fast path: DeepSeek V4.1 Flash primary with GLM-5.3 Flash in parallel for latency.
 
+## Generalizability
+
+The engine is not specific to the four studies. Any OpenSCAD source can be imported; its top-level dimensions are extracted and exposed as sliders, and the compiler-repair loop works on arbitrary generated source. The same local kernel + parameter extractor + repair loop can be reused in a CAD editor, an API, or a classroom tool. STL and SCAD are standard outputs, so adoption does not require a proprietary runtime.
+
 ## How AI is used
 
 The LLM is a **design compiler**, not a mesh generator. It receives the brief, a strict OpenSCAD design contract and worked examples, then returns a complete OpenSCAD program through a tool call. The browser compiles it with OpenSCAD WASM; the compiler log and detected floating solids feed back into a repair pass. The app opens with no preview or starter solid; a model appears only when the user generates one or explicitly opens a bench study. **New page** opens a fresh blank studio in a new tab. The model never executes code on the server. Parameters and direct code edits stay local and deterministic.
+
+## Demo quality
+
+Cadgo opens on a blank new part. The user can type a brief, import a `.scad`, or explicitly load a bench study; New page opens another blank studio in a new tab. The core journey — prompt, model, parameters, source, export — fits on one screen and is designed to be recorded in under three minutes ([VIDEO.md](VIDEO.md)).
 
 ## Technical notes
 
