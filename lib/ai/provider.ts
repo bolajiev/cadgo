@@ -53,7 +53,6 @@ export class DrafterError extends Error {
 
 const BASE_URL = process.env.OPENCODE_GO_BASE_URL ?? "https://opencode.ai/zen/go/v1";
 const MODEL = process.env.OPENCODE_GO_MODEL ?? "deepseek-v4.1-flash";
-const FALLBACK_MODEL = process.env.OPENCODE_GO_FALLBACK_MODEL ?? "glm-5.3-flash";
 const API_KEY = process.env.OPENCODE_GO_API_KEY ?? "";
 
 const cache = new Map<string, SpecResult>();
@@ -62,8 +61,7 @@ function cacheKey(kind: string, prompt: string) {
   return `${MODEL}:${kind}:${prompt.trim().toLowerCase()}`;
 }
 
-function modelForAttempt(attempt: number) {
-  if (attempt === 2) return FALLBACK_MODEL;
+function modelForAttempt() {
   return MODEL;
 }
 
@@ -212,7 +210,7 @@ export async function generateSpec(prompt: string, sessionId: string): Promise<S
       },
     ];
     try {
-      const result = await chat(modelForAttempt(attempt), messages, 0.35, sessionId);
+      const result = await chat(modelForAttempt(), messages, 0.35, sessionId);
       try {
         const parsed = parseSpec(result.raw, prompt);
         const issues = specErrors(parsed.spec);
@@ -265,7 +263,7 @@ export async function reviseSpec(
         : "");
     try {
       const result = await chat(
-        modelForAttempt(attempt),
+        modelForAttempt(),
         [
           { role: "system", content: system },
           { role: "user", content: user },

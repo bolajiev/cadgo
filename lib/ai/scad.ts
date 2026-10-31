@@ -60,7 +60,6 @@ export class ScadError extends Error {
 
 const BASE_URL = process.env.OPENCODE_GO_BASE_URL ?? "https://opencode.ai/zen/go/v1";
 const MODEL = process.env.OPENCODE_GO_DESIGN_MODEL ?? "deepseek-v4.1-flash";
-const FALLBACK_MODEL = process.env.OPENCODE_GO_DESIGN_FALLBACK_MODEL ?? "kimi-k3.1-pro";
 const API_KEY = process.env.OPENCODE_GO_API_KEY ?? "";
 
 const cache = new Map<string, ScadArtifact>();
@@ -375,7 +374,7 @@ async function callModel(
   const body: Record<string, unknown> = {
     model,
     messages,
-    temperature: /kimi/i.test(model) ? 1 : temperature,
+    temperature,
     max_tokens: maxTokens,
   };
   if (tools.length) {
@@ -429,16 +428,7 @@ async function runModel(
   tools: unknown[],
   maxTokens: number,
 ) {
-  try {
-    return await callModel(MODEL, messages, temperature, signal, sessionId, tools, maxTokens);
-  } catch (error) {
-    if (error instanceof ScadError && error.status === 499) throw error;
-    try {
-      return await callModel(FALLBACK_MODEL, messages, temperature, signal, sessionId, tools, maxTokens);
-    } catch {
-      throw error;
-    }
-  }
+  return callModel(MODEL, messages, temperature, signal, sessionId, tools, maxTokens);
 }
 
 async function planDesign(prompt: string, sessionId: string, signal: AbortSignal) {

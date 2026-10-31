@@ -140,7 +140,6 @@ function message(
 
 function makeModelLabel(model?: string) {
   if (!model) return undefined;
-  if (/kimi/i.test(model)) return "Kimi K3.1 Pro";
   if (/deepseek/i.test(model)) return model.includes("pro") ? "DeepSeek V4 Pro" : "DeepSeek V4.1 Flash";
   if (/glm/i.test(model)) return "GLM";
   return model;

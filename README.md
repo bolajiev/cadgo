@@ -86,7 +86,6 @@ Open `http://localhost:3000`. The part studio is `/` and starts on a blank new p
 | `OPENCODE_GO_API_KEY` | — | server-side key; never sent to the browser |
 | `OPENCODE_GO_BASE_URL` | `https://opencode.ai/zen/go/v1` | OpenAI-compatible endpoint |
 | `OPENCODE_GO_DESIGN_MODEL` | `deepseek-v4.1-flash` | planner and CAD writer |
-| `OPENCODE_GO_DESIGN_FALLBACK_MODEL` | `kimi-k3.1-pro` | fallback if the primary fails |
 
 ### Checks
 
@@ -123,7 +122,7 @@ The app opens blank. Loading a bench study or generating a part is an explicit a
 
 ## Built with
 
-Next.js 16, React 19, React Three Fiber, three.js, **OpenSCAD WebAssembly**, Zustand, Zod, Vercel. The design engine uses an OpenAI-compatible endpoint (DeepSeek V4.1 Flash / Kimi K3.1 Pro via OpenCode Go).
+Next.js 16, React 19, React Three Fiber, three.js, **OpenSCAD WebAssembly**, Zustand, Zod, Vercel. The design engine uses an OpenAI-compatible endpoint (DeepSeek V4.1 Flash via OpenCode Go).
 
 The paper-and-ink plate language was informed by the [Anatomy](https://github.com/wheresryan22/anatomy) craft rules. The OpenSCAD WASM distribution and its source offer come from [CADAM](https://github.com/Adam-CAD/CADAM); see [THIRD_PARTY.md](THIRD_PARTY.md).
 
