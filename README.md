@@ -22,6 +22,7 @@ The app opens on a **blank new part** — no hardcoded preview. **New page** ope
 - **Local parameter rebuilds.** Move a slider and the model recompiles in the browser. No AI round-trip, no server geometry.
 - **Build checks.** If generated code does not compile, the compiler log goes back to the model. The kernel also counts connected bodies; every declared part must be a separate watertight body, or the model gets a quality-repair pass.
 - **Research before drawing.** A planning pass lists every real part and the standards/missing dimensions to verify. The server searches for those references and shows the sources beside the reply; if a lookup fails, the assumption is stated.
+- **Parametric audit.** Generated source is checked before it is accepted. Every driving number inside a module must be a named top-level parameter or derived value; hardcoded dimensions are sent back for repair. See [AGENTS.md](AGENTS.md).
 - **Optional inspector.** Dimensions and Source are buttons, not default panels. The stage keeps the space; open the inspector only when you need a slider or the code.
 - **Direct download.** The header's Download button saves the current, edited part as STL. Source export and share links live in Export.
 - **Plan-first quality pass.** DeepSeek V4.1 Flash decomposes the object into real parts, researches the printer/standards, writes OpenSCAD, then checks the render against the reference. The deliberate path has no fast model fallback and no fused assemblies. Compiler, body-count and visual gates are the checks.

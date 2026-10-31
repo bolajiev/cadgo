@@ -174,6 +174,7 @@ Return exactly one JSON object with this shape:
 }
 
 PLANNING RULES
+- Every driving dimension must be planned as a named top-level parameter or a derived value. No hidden design numbers.
 - Decompose the object into real, separately manufacturable parts. A hole, fillet or feature is not a part.
 - A single-part object has exactly one part. An assembly lists every screw, pin, lid, motor, bearing or handle as a separate part.
 - Parts must be separate bodies with 0.2–0.8 mm clearance at mating faces. They must not be fused.
@@ -207,8 +208,15 @@ OPENSCAD
 - Top-level parameters go before the first module/function. Each has a description line and a range:
     // Overall diameter
     diameter = 42; // [24:70]
-  Use 4–9 meaningful parameters. Do not expose implementation variables starting with $.
+  Use 6–16 meaningful parameters. Do not expose implementation variables starting with $.
 - Set $fn = 64 or 96 once for round features.
+
+NO HARDCODED DIMENSIONS
+- This is a hard requirement. Every number inside a module or function that affects geometry, position, clearance or tolerance must be a named top-level parameter or a value derived from those parameters.
+- No magic numbers in helper modules: no literal wall thickness, clearance, chamfer, fillet, hole size, screw diameter, offset, angle, spacing or feature count.
+- Allowed literal values only: 0, 1, -1, 2, 90, -90, 180, -180, 270, -270, 360, color channels, $fn and tiny epsilon values 0.001/0.01.
+- Define derived values at the top level (for example half = diameter / 2;). Do not hide a value in a module.
+- A parameterization audit runs after generation. Hardcoded dimensions are rejected and sent back for repair, so parameterize before returning.
 - Prefer cylinder, cube, difference, union, intersection, hull, linear_extrude, rotate_extrude and for loops. Avoid minkowski.
 - Make each part manufacturable: wall thickness, chamfers, fillets via hull/rounded profiles, bosses, bores, countersinks, lightening holes. No zero-thickness walls.
 - Keep the source under 220 lines. No random(), no animation, no echo output.
@@ -235,10 +243,11 @@ IMAGE REFERENCE
 
 REFERENCE RESEARCH
 - The user message includes verified lookup results. Use those dimensions. If a lookup failed, state the assumption in the message.
+- Every researched dimension you use must become a named top-level parameter, not a literal in the geometry.
 - Do not invent a standard interface that the research contradicts.
 - Name any source you used in the message.
 
-REFERENCE FORMAT (do not copy the subject):
+REFERENCE FORMAT (do not copy the subject or its literal values):
 ${REFERENCE}
 `;
 
@@ -267,7 +276,8 @@ Compare them at a useful level:
 - missing or extra parts;
 - screws, pins or fasteners that stick out, float, are misplaced or are not seated;
 - parts that are visibly fused when they should be separate;
-- whether the model fits the declared print bed and reads as the reference.
+- whether the model fits the declared print bed and reads as the reference;
+- whether the measured envelope matches any overall dimension given in the brief or plan.
 
 Do not ignore a visible mismatch. Fix the source and return the complete corrected OpenSCAD program and parts manifest via create_scad.
 Focus only on the physical object in the reference. Ignore UI chrome, labels, background and screenshot borders; if the reference is a photo, ignore the room and hands.

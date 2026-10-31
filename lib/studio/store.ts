@@ -4,6 +4,7 @@ import { create } from "zustand";
 import LZString from "lz-string";
 import { scadClient } from "@/lib/scad/client";
 import type { ScadMesh, ScadParamValue } from "@/lib/scad/types";
+import { auditParameterization } from "@/lib/scad/audit";
 import {
   parametersToValues,
   parseParameters,
@@ -347,7 +348,13 @@ function geometryIssue(outcome: CompileOutcome, parts: StudioPart[]) {
   return null;
 }
 
-function artifactNote(artifact: ApiArtifact, outcome: CompileOutcome, repaired: number, visualChecked = false) {
+function artifactNote(
+  artifact: ApiArtifact,
+  outcome: CompileOutcome,
+  repaired: number,
+  visualChecked = false,
+  parametric?: { ok: boolean; params: number },
+) {
   const label = makeModelLabel(artifact.model) ?? "Design compiler";
   const parts = artifact.parts ?? [];
   const bodyCount = outcome.mesh?.components ?? 0;
@@ -355,6 +362,8 @@ function artifactNote(artifact: ApiArtifact, outcome: CompileOutcome, repaired: 
   if (bodyCount) bits.push(`${bodyCount} bod${bodyCount === 1 ? "y" : "ies"}`);
   if (parts.length > 1) bits.push(`${parts.length} part types`);
   if (parts.length && bodyCount !== expectedBodies(parts)) bits.push("body mismatch");
+  if (parametric?.ok) bits.push(`fully parametric · ${parametric.params} params`);
+  else if (parametric && !parametric.ok) bits.push("hardcoded dimensions remain");
   if (artifact.sources?.length) bits.push(`${artifact.sources.length} source${artifact.sources.length === 1 ? "" : "s"}`);
   if (visualChecked) bits.push("visual check");
   if (repaired) bits.push(repaired === 1 ? "quality-repaired" : `quality-repaired ×${repaired}`);
@@ -574,7 +583,12 @@ export const useStudio = create<StudioState>((set, get) => ({
       const response = await fetch("/api/studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, image, profile, sessionId: sessionId() }),
+        body: JSON.stringify({
+          prompt,
+          image: image ?? undefined,
+          profile: profile ?? undefined,
+          sessionId: sessionId(),
+        }),
         signal: currentAbort.signal,
       });
       if (token !== requestSeq) return;
@@ -677,6 +691,36 @@ export const useStudio = create<StudioState>((set, get) => ({
           }
         }
       }
+      let parametric = auditParameterization(artifact.code);
+      let parametricRepairs = 0;
+      while (!parametric.ok && parametricRepairs < 2 && token === requestSeq) {
+        parametricRepairs++;
+        repaired++;
+        set({ status: "repairing" });
+        try {
+          artifact = await repairArtifact(artifact.code, parametric.message, artifact.parts ?? [], sessionId());
+        } catch {
+          break;
+        }
+        outcome = await evaluateCode(artifact.code);
+        parametric = auditParameterization(artifact.code);
+      }
+      let postAuditRepairs = 0;
+      while (outcome.ok && outcome.mesh && geometryIssue(outcome, artifact.parts ?? []) && postAuditRepairs < 1) {
+        if (token !== requestSeq) return;
+        const issue = geometryIssue(outcome, artifact.parts ?? []);
+        if (!issue) break;
+        postAuditRepairs++;
+        repaired++;
+        set({ status: "repairing" });
+        try {
+          artifact = await repairArtifact(artifact.code, issue, artifact.parts ?? [], sessionId());
+        } catch {
+          break;
+        }
+        outcome = await evaluateCode(artifact.code);
+      }
+      parametric = auditParameterization(artifact.code);
       if (token !== requestSeq) return;
       if (!outcome.ok || !outcome.mesh || !outcome.params || !outcome.values) {
         set({
@@ -711,7 +755,7 @@ export const useStudio = create<StudioState>((set, get) => ({
           message(
             "ai",
             artifact.message,
-            artifactNote(artifact, outcome, repaired, visualChecked),
+            artifactNote(artifact, outcome, repaired, visualChecked, parametric),
             artifact.sources,
           ),
         ],
@@ -773,6 +817,20 @@ export const useStudio = create<StudioState>((set, get) => ({
         artifact = await repairArtifact(artifact.code, issue, artifact.parts ?? [], sessionId());
         outcome = await evaluateCode(artifact.code);
       }
+      let parametric = auditParameterization(artifact.code);
+      let parametricRepairs = 0;
+      while (!parametric.ok && parametricRepairs < 2 && token === requestSeq) {
+        parametricRepairs++;
+        repaired++;
+        set({ status: "repairing" });
+        try {
+          artifact = await repairArtifact(artifact.code, parametric.message, artifact.parts ?? [], sessionId());
+        } catch {
+          break;
+        }
+        outcome = await evaluateCode(artifact.code);
+        parametric = auditParameterization(artifact.code);
+      }
       if (token !== requestSeq) return;
       if (!outcome.ok || !outcome.mesh || !outcome.params || !outcome.values) {
         set({
@@ -802,7 +860,7 @@ export const useStudio = create<StudioState>((set, get) => ({
           message(
             "ai",
             artifact.message,
-            `Edited in place · ${changed} line${changed === 1 ? "" : "s"} changed · ${artifactNote(artifact, outcome, repaired)}`,
+            `Edited in place · ${changed} line${changed === 1 ? "" : "s"} changed · ${artifactNote(artifact, outcome, repaired, false, parametric)}`,
             artifact.sources,
           ),
         ],
