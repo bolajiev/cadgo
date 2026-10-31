@@ -4,7 +4,7 @@
 
 Cadgo is a browser-based AI CAD workbench. A plain-language brief becomes editable **OpenSCAD** source, compiled locally with the OpenSCAD WebAssembly kernel. Parameters rebuild in the browser, the source is visible and editable, and every model exports as STL or SCAD.
 
-**Live demo:** https://cadgo.vercel.app  
+**Live demo:** https://cadgo-ashy.vercel.app  
 **Repository:** https://github.com/bolajiev/cadgo  
 **Hackathon:** Victoria VR AI Builder Hackathon 2026 · **AI-assisted 3D editing**
 
@@ -15,13 +15,16 @@ The app opens on a **blank new part** — no hardcoded preview. **New page** ope
 ## What it does
 
 - **Prompt → parametric CAD.** Write “a 100 × 60 × 8 mm mounting plate with four 5 mm corner holes and rounded corners.” Cadgo writes OpenSCAD, compiles it in the browser, and exposes its dimensions as sliders.
+- **Image → parametric CAD.** Attach a photo or render. The agent asks what it is for, asks for the printer and bed size when relevant, and uses the image as a geometric reference. It is a printable approximation, not a pixel-perfect scan.
+- **Print setup + research.** The agent asks purpose, printer, bed, material and supports; it researches the printer's build volume and FDM constraints and treats the bed as a hard envelope.
+- **Visual check.** After compiling, Cadgo renders the model and sends the render plus the reference image back through DeepSeek vision. The inspector must fix visible mismatches or the correction is rejected if it breaks the body check.
 - **Chat to edit.** Reply in the same thread; the agent revises the current source instead of starting over. The reply reports how many lines changed.
 - **Local parameter rebuilds.** Move a slider and the model recompiles in the browser. No AI round-trip, no server geometry.
 - **Build checks.** If generated code does not compile, the compiler log goes back to the model. The kernel also counts connected bodies; every declared part must be a separate watertight body, or the model gets a quality-repair pass.
 - **Research before drawing.** A planning pass lists every real part and the standards/missing dimensions to verify. The server searches for those references and shows the sources beside the reply; if a lookup fails, the assumption is stated.
 - **Optional inspector.** Dimensions and Source are buttons, not default panels. The stage keeps the space; open the inspector only when you need a slider or the code.
 - **Direct download.** The header's Download button saves the current, edited part as STL. Source export and share links live in Export.
-- **Plan-first quality pass.** DeepSeek V4.1 Flash first decomposes the object into real parts and researches named standards, then writes OpenSCAD. The deliberate path has no 4-second fast pass and no fused assemblies. A local compiler and body-count check are the gates.
+- **Plan-first quality pass.** DeepSeek V4.1 Flash decomposes the object into real parts, researches the printer/standards, writes OpenSCAD, then checks the render against the reference. The deliberate path has no fast model fallback and no fused assemblies. Compiler, body-count and visual gates are the checks.
 - **Benchbook.** A knurled knob, honeycomb bracket, twisted vase and spur gear load instantly and stay fully parametric.
 
 ![The blank new-part state, prompt composer and benchbook entry point](docs/studio-panel.png)
@@ -118,7 +121,7 @@ The app opens blank. Loading a bench study or generating a part is an explicit a
 - **Impact (30%):** turns natural language into an editable, exportable CAD starting point for hardware teams, makers and educators; standard STL/SCAD output fits existing workflows.
 - **Generalizability (25%):** OpenSCAD import, source-preserving parameter extraction and a reusable compile/repair engine apply to arbitrary parametric parts, not just the benchbook.
 - **Technical depth (20%):** local OpenSCAD WebAssembly kernel, module worker, parameter extraction, compiler repair, separate-part body checks, deterministic local rebuilds, binary STL writer, SSRF-guarded reference lookup, tests.
-- **Demo quality (25%):** blank new-part start, opt-in benchbook, one-screen chat → model → optional dimensions/source → direct STL download; the chat edits the current part; the shot list is in [VIDEO.md](VIDEO.md).
+- **Demo quality (25%):** blank new-part start, image + print setup, visible research, plan, render and visual repair, one-screen chat → model → optional dimensions/source → direct STL download; the shot list is in [VIDEO.md](VIDEO.md).
 
 ## Built with
 

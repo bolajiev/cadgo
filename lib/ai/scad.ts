@@ -1,9 +1,14 @@
 import { jsonrepair } from "jsonrepair";
 import { webLookup } from "./web";
+import type { PrintProfile, StudioImage } from "@/lib/studio/profile";
+
+type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
 
 type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
-  content: string;
+  content: string | ContentPart[];
   tool_calls?: ToolCall[];
   tool_call_id?: string;
 };
@@ -43,11 +48,19 @@ export type ScadArtifact = {
 };
 
 type DesignPlan = {
+  subject: string;
   interpretation: string;
   parts: string[];
   lookups: string[];
   dimensions: { name: string; value: string; source: string }[];
+  imageNotes: string;
+  unknowns: string;
   risks: string;
+};
+
+export type GenerateOptions = {
+  image?: StudioImage;
+  profile?: PrintProfile;
 };
 
 export class ScadError extends Error {
@@ -150,7 +163,10 @@ const PLANNER_SYSTEM = `You are Cadgo's lead CAD engineer. Plan before anyone wr
 
 Return exactly one JSON object with this shape:
 {
+  "subject": "short object name",
   "interpretation": "what the object is, its constraints, and what is deliberately assumed",
+  "image_observations": "what the image shows, visible proportions, scale clues, hidden sides",
+  "unknowns": "what the image or brief does not establish",
   "parts": [{ "name": "short real part name", "role": "what it does and how it mates" }],
   "dimensions": [{ "name": "dimension", "value": "value and unit", "source": "given | assumed | lookup" }],
   "lookups": ["specific web search queries for real standards or missing critical dimensions"],
@@ -163,6 +179,9 @@ PLANNING RULES
 - Parts must be separate bodies with 0.2–0.8 mm clearance at mating faces. They must not be fused.
 - List lookups for named real components, standards, fasteners, motors, boards and fittings. Do not invent a mounting pattern you can verify.
 - For fasteners, plan clearance holes, not tapped holes. Every screw or bolt instance must remain a separate body with clearance.
+- The user message includes a PRINT PROFILE. If its purpose is 3d-print, treat the bed as a hard envelope, plan for a flat base, minimum walls, and no supports unless allowed.
+- If an image is attached, inspect the visible geometry and scale clues. State what is hidden. Never claim a hidden dimension is known.
+- If the image has no scale and no known dimension is given, add a lookup/assumption note; do not pretend the size is measured.
 - Use the user's dimensions first. Mark missing dimensions as assumed.
 - Be concise. No prose outside the JSON.`;
 
@@ -203,6 +222,17 @@ CRAFT
 - Vases/containers: closed bottom, wall thickness, rim, twist or facet count.
 - Mechanisms: separate links, pins, bearings and fasteners with working clearances.
 
+PRINT PROFILE
+- The user message includes the purpose, printer, build volume, material and support choice. Treat them as constraints.
+- For purpose 3d-print: fit inside the build volume, sit on a flat base, use at least 1.2 mm walls, and avoid overhangs beyond 45 degrees when supports are disallowed.
+- Do not silently shrink the user's dimensions to fit. If the part exceeds the bed, make a sensible split or state the overflow in the message.
+- For visualization only, ignore printer constraints. For CNC or assembly, state the assumed process in the message.
+
+IMAGE REFERENCE
+- If an image is attached, reconstruct its visible geometry as parametric CAD. Use its proportions and features.
+- Do not claim to see the hidden back, internal structure or exact scale. State those assumptions in the message.
+- A known dimension or scale note in the brief overrides visual estimates.
+
 REFERENCE RESEARCH
 - The user message includes verified lookup results. Use those dimensions. If a lookup failed, state the assumption in the message.
 - Do not invent a standard interface that the research contradicts.
@@ -228,6 +258,21 @@ const REPAIR_SYSTEM = `${DESIGN_RULES}
 
 You are fixing OpenSCAD source that failed a build check. Return the complete corrected source and parts manifest.
 Keep the design intent and parameter names. Fix the syntax, geometry, or body-count problem named in the check. If the body count does not match the parts manifest, fasteners are the usual cause: replace tap holes with through clearance holes 0.3–0.5 mm larger than the shank, remove threads from mating parts, and add an axial gap under each head. Every declared instance must be its own body. Do not simplify the model away.`;
+
+const REVIEW_SYSTEM = `${DESIGN_RULES}
+
+You are Cadgo's visual inspector. You receive a reference image and a render of the current OpenSCAD model.
+Compare them at a useful level:
+- silhouette, proportions and overall orientation;
+- missing or extra parts;
+- screws, pins or fasteners that stick out, float, are misplaced or are not seated;
+- parts that are visibly fused when they should be separate;
+- whether the model fits the declared print bed and reads as the reference.
+
+Do not ignore a visible mismatch. Fix the source and return the complete corrected OpenSCAD program and parts manifest via create_scad.
+Focus only on the physical object in the reference. Ignore UI chrome, labels, background and screenshot borders; if the reference is a photo, ignore the room and hands.
+Preserve requested dimensions and the reference's geometry. If the render already matches, return the source unchanged with a short message that the visual check passed.
+If the reference angle hides a face, do not invent it; state the assumption. Do not claim a visual match you cannot see.`;
 
 function parseToolArguments(value: string | Record<string, unknown> | undefined) {
   if (!value) return null;
@@ -308,7 +353,12 @@ function normalizePlan(text: string, prompt: string): DesignPlan {
         }];
       })
     : [];
+  const subject =
+    typeof raw.subject === "string" && raw.subject.trim()
+      ? raw.subject.trim().slice(0, 120)
+      : prompt.slice(0, 80);
   return {
+    subject,
     interpretation:
       typeof raw.interpretation === "string" && raw.interpretation.trim()
         ? raw.interpretation.trim().slice(0, 900)
@@ -316,6 +366,10 @@ function normalizePlan(text: string, prompt: string): DesignPlan {
     parts: [...new Set(parts.filter(Boolean))].slice(0, 12),
     lookups: [...new Set(lookups.map((item) => item.trim()))].slice(0, 3),
     dimensions: dimensions.slice(0, 16),
+    imageNotes:
+      typeof raw.image_observations === "string" ? raw.image_observations.trim().slice(0, 700) : "",
+    unknowns:
+      typeof raw.unknowns === "string" ? raw.unknowns.trim().slice(0, 500) : "",
     risks: typeof raw.risks === "string" ? raw.risks.trim().slice(0, 500) : "",
   };
 }
@@ -431,11 +485,54 @@ async function runModel(
   return callModel(MODEL, messages, temperature, signal, sessionId, tools, maxTokens);
 }
 
-async function planDesign(prompt: string, sessionId: string, signal: AbortSignal) {
+function profileBrief(profile?: PrintProfile) {
+  if (!profile) return "PRINT PROFILE: not set. Do not claim the model is print-ready.";
+  const bed = profile.bed;
+  return [
+    `PURPOSE: ${profile.purpose}`,
+    profile.printer ? `PRINTER: ${profile.printer}` : "",
+    bed ? `BUILD VOLUME: ${bed.x} x ${bed.y} x ${bed.z} mm` : "BUILD VOLUME: not set",
+    profile.material ? `MATERIAL: ${profile.material}` : "",
+    profile.supports ? `SUPPORTS: ${profile.supports}` : "",
+    profile.scaleNote ? `KNOWN SCALE / DIMENSION: ${profile.scaleNote}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+function userContent(text: string, image?: StudioImage): string | ContentPart[] {
+  if (!image) return text;
+  return [
+    { type: "text", text },
+    { type: "image_url", image_url: { url: image.dataUrl } },
+  ];
+}
+
+function multiImageContent(text: string, images: { dataUrl: string }[]): string | ContentPart[] {
+  if (!images.length) return text;
+  return [
+    { type: "text", text },
+    ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.dataUrl } })),
+  ];
+}
+
+async function planDesign(
+  prompt: string,
+  options: GenerateOptions,
+  sessionId: string,
+  signal: AbortSignal,
+) {
+  const imageNote = options.image
+    ? "An image is attached. Inspect it for shape, proportions, visible features, scale clues and hidden sides."
+    : "No image is attached.";
   const response = await runModel(
     [
       { role: "system", content: PLANNER_SYSTEM },
-      { role: "user", content: `BRIEF: ${prompt}\n\nReturn the planning JSON now.` },
+      {
+        role: "user",
+        content: userContent(
+          `BRIEF: ${prompt}\n\n${profileBrief(options.profile)}\n\nIMAGE: ${imageNote}\n\nReturn the planning JSON now.`,
+          options.image,
+        ),
+      },
     ],
     0.2,
     signal,
@@ -443,7 +540,8 @@ async function planDesign(prompt: string, sessionId: string, signal: AbortSignal
     [],
     3500,
   );
-  return normalizePlan(response.message.content ?? "", prompt);
+  const content = Array.isArray(response.message.content) ? "" : response.message.content ?? "";
+  return normalizePlan(content, prompt);
 }
 
 function inferLookupQuery(prompt: string) {
@@ -456,8 +554,21 @@ function inferLookupQuery(prompt: string) {
   return null;
 }
 
-function lookupQueries(prompt: string, plan: DesignPlan) {
+function lookupQueries(
+  prompt: string,
+  plan: DesignPlan,
+  profile?: PrintProfile,
+  image?: StudioImage,
+) {
   const queries = [...plan.lookups];
+  if (profile?.printer) {
+    queries.unshift(`${profile.printer} build volume print bed size`);
+  } else if (profile?.purpose === "3d-print") {
+    queries.push("FDM 3D printing minimum wall thickness overhang clearance guidelines");
+  }
+  if (!queries.length && image) {
+    queries.push(`${plan.subject || prompt.slice(0, 80)} dimensions design reference`);
+  }
   if (!queries.length) {
     const inferred = inferLookupQuery(prompt);
     if (inferred) queries.push(inferred);
@@ -471,7 +582,12 @@ async function researchReferences(queries: string[]) {
   const results = await Promise.all(
     queries.map(async (query) => {
       try {
-        return await webLookup(query);
+        let value = await webLookup(query);
+        if (!value.results.length) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          value = await webLookup(query);
+        }
+        return value;
       } catch (error) {
         return { query, results: [], error: error instanceof Error ? error.message : "Lookup failed" };
       }
@@ -531,20 +647,30 @@ export async function generateScad(
   prompt: string,
   sessionId: string,
   signal?: AbortSignal,
+  options: GenerateOptions = {},
 ): Promise<ScadArtifact> {
-  const key = `scad:${prompt.trim().toLowerCase()}`;
-  const hit = cache.get(key);
-  if (hit) return { ...hit, ms: 0 };
+  const profileKey = options.profile
+    ? `${options.profile.purpose}:${options.profile.printer ?? ""}:${options.profile.bed?.x ?? ""}x${options.profile.bed?.y ?? ""}x${options.profile.bed?.z ?? ""}:${options.profile.material ?? ""}:${options.profile.scaleNote ?? ""}`
+    : "no-profile";
+  const key = `scad:${prompt.trim().toLowerCase()}:${profileKey}`;
+  const canCache = !options.image;
+  if (canCache) {
+    const hit = cache.get(key);
+    if (hit) return { ...hit, ms: 0 };
+  }
   const started = Date.now();
   const runSignal = signal ?? new AbortController().signal;
-  const plan = await planDesign(prompt, sessionId, runSignal);
-  const queries = lookupQueries(prompt, plan);
+  const plan = await planDesign(prompt, options, sessionId, runSignal);
+  const queries = lookupQueries(prompt, plan, options.profile, options.image);
   const research = queries.length
     ? await researchReferences(queries)
-    : { sources: [], text: "No external lookup was requested by the plan. Use stated assumptions." };
+    : { sources: [], text: "No external lookup was requested. Use stated assumptions and say so." };
   const planBlock = JSON.stringify(
     {
+      subject: plan.subject,
       interpretation: plan.interpretation,
+      image_observations: plan.imageNotes,
+      unknowns: plan.unknowns,
       parts: plan.parts,
       dimensions: plan.dimensions,
       lookups: plan.lookups,
@@ -558,7 +684,10 @@ export async function generateScad(
       { role: "system", content: GENERATE_SYSTEM },
       {
         role: "user",
-        content: `BRIEF: ${prompt}\n\nAPPROVED PLAN:\n${planBlock}\n\nREFERENCE RESEARCH:\n${research.text}\n\nBuild every planned part as a separate body. Call create_scad once with the complete source and the matching parts manifest.`,
+        content: userContent(
+          `BRIEF: ${prompt}\n\n${profileBrief(options.profile)}\n\nAPPROVED PLAN:\n${planBlock}\n\nREFERENCE RESEARCH:\n${research.text}\n\nBuild every planned part as a separate body. The attached image is the reference; match its visible geometry and proportions where the plan supports it. Call create_scad once with the complete source and the matching parts manifest.`,
+          options.image,
+        ),
       },
     ],
     sessionId,
@@ -566,8 +695,10 @@ export async function generateScad(
     research.sources,
     started,
   );
-  cache.set(key, artifact);
-  if (cache.size > 32) cache.delete(cache.keys().next().value as string);
+  if (canCache) {
+    cache.set(key, artifact);
+    if (cache.size > 32) cache.delete(cache.keys().next().value as string);
+  }
   return artifact;
 }
 
@@ -612,6 +743,42 @@ export async function repairScad(
     ],
     sessionId,
     signal ?? new AbortController().signal,
+    [],
+    started,
+  );
+}
+
+export async function reviewScad(input: {
+  code: string;
+  parts: ScadPart[];
+  prompt: string;
+  profile?: PrintProfile;
+  referenceImage?: string;
+  render: string;
+  metrics: string;
+  sessionId: string;
+  signal?: AbortSignal;
+}): Promise<ScadArtifact> {
+  const started = Date.now();
+  const images = [
+    input.referenceImage ? { dataUrl: input.referenceImage, label: "REFERENCE IMAGE" } : null,
+    { dataUrl: input.render, label: "CURRENT MODEL RENDER" },
+  ].filter((item): item is { dataUrl: string; label: string } => Boolean(item));
+  const partsText = input.parts.map((part) => `${part.name} x${part.quantity}`).join(", ") || "not declared";
+  const labels = images.map((item, index) => `Image ${index + 1}: ${item.label}`).join("\n");
+  return buildArtifact(
+    [
+      { role: "system", content: REVIEW_SYSTEM },
+      {
+        role: "user",
+        content: multiImageContent(
+          `BRIEF: ${input.prompt}\n\n${profileBrief(input.profile)}\n\nDECLARED PARTS: ${partsText}\n\nMEASURED MESH: ${input.metrics}\n\n${labels}\n\nCURRENT OPENSCAD SOURCE:\n${input.code.slice(0, 60000)}\n\nCompare the reference and the render. Correct visible geometry errors and return the complete source and matching parts manifest via create_scad.`,
+          images,
+        ),
+      },
+    ],
+    input.sessionId,
+    input.signal ?? new AbortController().signal,
     [],
     started,
   );

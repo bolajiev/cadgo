@@ -10,6 +10,8 @@ import { useStudio } from "@/lib/studio/store";
 import { useToast } from "@/lib/store/ui";
 import { SCAD_EXAMPLES } from "@/lib/scad/examples";
 import { formatNumber } from "@/lib/format";
+import { fileToStudioImage } from "@/lib/studio/image";
+import { PrintSetup } from "./PrintSetup";
 
 function BrandMark() {
   return (
@@ -28,6 +30,7 @@ function statusLabel(status: string) {
   if (status === "drafting") return "Thinking";
   if (status === "compiling") return "Building";
   if (status === "repairing") return "Checking";
+  if (status === "reviewing") return "Visual check";
   if (status === "error") return "Needs attention";
   return "Ready";
 }
@@ -120,6 +123,10 @@ export function StudioApp() {
   const generate = useStudio((state) => state.generate);
   const refineModel = useStudio((state) => state.refineModel);
   const loadExample = useStudio((state) => state.loadExample);
+  const referenceImage = useStudio((state) => state.referenceImage);
+  const printProfile = useStudio((state) => state.printProfile);
+  const setReferenceImage = useStudio((state) => state.setReferenceImage);
+  const setPrintProfile = useStudio((state) => state.setPrintProfile);
 
   const setView = useStudio((state) => state.setView);
   const fit = useStudio((state) => state.fit);
@@ -128,8 +135,10 @@ export function StudioApp() {
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
   const [chatText, setChatText] = useState("");
   const [inspector, setInspector] = useState<"dimensions" | "source" | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
   const importScad = useStudio((state) => state.importScad);
 
   const openImporter = () => fileRef.current?.click();
@@ -147,9 +156,38 @@ export function StudioApp() {
     boot();
   }, [boot]);
 
+  const attachImage = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const image = await fileToStudioImage(file);
+      setReferenceImage(image);
+      setPrintProfile(null);
+      setShowSetup(true);
+      useToast.getState().notify("Reference image attached · set up the print profile");
+    } catch (error) {
+      useToast.getState().notify(error instanceof Error ? error.message : "Could not read that image", "accent");
+    }
+  };
+
+  const clearImage = () => {
+    setReferenceImage(null);
+    setPrintProfile(null);
+    setShowSetup(false);
+  };
+
   const sendChat = () => {
     const text = chatText.trim();
     if (!text || busy) return;
+    if (referenceImage && !printProfile) {
+      setShowSetup(true);
+      useToast.getState().notify("Choose what the image is for first — the agent needs scale and process.", "accent");
+      return;
+    }
+    if (referenceImage && printProfile?.purpose === "3d-print" && !printProfile.bed) {
+      setShowSetup(true);
+      useToast.getState().notify("Add the printer bed size before generating for print.", "accent");
+      return;
+    }
     setChatText("");
     if (code) refineModel(text);
     else generate(text);
@@ -160,9 +198,10 @@ export function StudioApp() {
     if (node) node.scrollTop = node.scrollHeight;
   }, [messages, status]);
 
-  const busy = status === "drafting" || status === "repairing" || status === "compiling";
-  const working = status === "drafting" || status === "repairing";
-  const canSend = chatText.trim().length > 1 && !busy;
+  const busy = status === "drafting" || status === "repairing" || status === "compiling" || status === "reviewing";
+  const working = status === "drafting" || status === "repairing" || status === "reviewing";
+  const profileReady = !referenceImage || Boolean(printProfile);
+  const canSend = chatText.trim().length > 1 && !busy && profileReady;
   const bounds = mesh?.bounds;
   const dims = bounds
     ? [
@@ -170,6 +209,19 @@ export function StudioApp() {
         Math.round(bounds.max[1] - bounds.min[1]),
         Math.round(bounds.max[2] - bounds.min[2]),
       ]
+    : null;
+  const bed = printProfile?.purpose === "3d-print" ? printProfile.bed : undefined;
+  const bedOverflow = bed && dims
+    ? (["x", "y", "z"] as const).filter((axis, index) => dims[index] > bed[axis])
+    : [];
+  const profileLabel = printProfile
+    ? printProfile.purpose === "3d-print"
+      ? `3D print${printProfile.printer ? ` · ${printProfile.printer}` : ""}${printProfile.bed ? ` · ${printProfile.bed.x}×${printProfile.bed.y}×${printProfile.bed.z}` : ""}`
+      : printProfile.purpose === "visualization"
+        ? "Visualization"
+        : printProfile.purpose === "cnc"
+          ? "CNC / laser"
+          : "Assembly"
     : null;
 
   return (
@@ -292,6 +344,9 @@ export function StudioApp() {
                       </span>
                       <span className="mono studio-message-time">{item.time}</span>
                     </div>
+                    {item.image ? (
+                      <img className="studio-message-image" src={item.image.dataUrl} alt={item.image.name} />
+                    ) : null}
                     <p>{item.text}</p>
                     {item.note ? <span className="studio-message-note mono">{item.note}</span> : null}
                     {item.sources?.length ? (
@@ -313,16 +368,45 @@ export function StudioApp() {
                     {status === "drafting"
                       ? code
                         ? "Thinking through the edit. Declared parts stay separate…"
-                        : "Planning the parts, checking references, then building…"
+                        : referenceImage
+                          ? `Reading the image, planning, researching${printProfile?.printer ? ` ${printProfile.printer}` : " references"}, then building…`
+                          : "Planning the parts, checking references, then building…"
                       : status === "repairing"
                         ? "Checking the bodies and clearing the repair…"
-                        : "Compiling locally…"}
+                        : status === "reviewing"
+                          ? "Comparing the render to the reference image…"
+                          : "Compiling locally…"}
                   </p>
                 </div>
               ) : null}
             </div>
 
+            {showSetup ? (
+              <PrintSetup
+                initial={printProfile}
+                hasImage={Boolean(referenceImage)}
+                onSave={(profile) => {
+                  setPrintProfile(profile);
+                  setShowSetup(false);
+                  useToast.getState().notify("Agent setup saved");
+                }}
+                onCancel={() => setShowSetup(false)}
+              />
+            ) : null}
+
             <div className="studio-compose">
+              {referenceImage ? (
+                <div className="studio-image-preview">
+                  <img src={referenceImage.dataUrl} alt={referenceImage.name} />
+                  <div>
+                    <strong>{referenceImage.name}</strong>
+                    <span className="mono">{referenceImage.width}×{referenceImage.height} px · reference</span>
+                  </div>
+                  <button className="icon-btn" onClick={clearImage} aria-label="Remove reference image">
+                    <Icon name="close" />
+                  </button>
+                </div>
+              ) : null}
               <textarea
                 ref={composerRef}
                 id="studio-chat-input"
@@ -339,14 +423,49 @@ export function StudioApp() {
                 placeholder={
                   code
                     ? "Ask for a change — make the flange 6 mm thicker, add a cable slot…"
-                    : "Describe a part — a 100 × 60 × 8 mm mounting plate with four 5 mm holes…"
+                    : referenceImage
+                      ? "What should I keep or change from the image? Add a known dimension if you have one…"
+                      : "Describe a part — a 100 × 60 × 8 mm mounting plate with four 5 mm holes…"
                 }
               />
               <div className="studio-compose-actions">
-                <span className="mono studio-hint">⌘↵ · {code ? "edits this part" : "creates a part"}</span>
-                <button className="draft-btn" onClick={sendChat} disabled={!canSend}>
-                  {busy ? "Working…" : code ? "Send" : "Generate"} <Icon name="arrow" />
-                </button>
+                <div className="studio-compose-tools">
+                  <button
+                    className="studio-tool-btn"
+                    onClick={() => imageRef.current?.click()}
+                    disabled={busy || Boolean(code)}
+                    title={code ? "Start a new part to attach a reference image" : "Attach a reference image"}
+                    aria-label="Attach a reference image"
+                  >
+                    <Icon name="image" size={13} />
+                  </button>
+                  <button
+                    className={`studio-profile-chip ${printProfile ? "active" : ""}`}
+                    onClick={() => setShowSetup(true)}
+                    disabled={busy}
+                    title="Set print purpose, printer and bed"
+                  >
+                    <Icon name="printer" size={12} />
+                    <span>{profileLabel ?? "Print setup"}</span>
+                  </button>
+                  <input
+                    ref={imageRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="studio-file-input"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      attachImage(file);
+                    }}
+                  />
+                </div>
+                <div className="studio-compose-send">
+                  <span className="mono studio-hint">⌘↵ · {code ? "edits this part" : "creates a part"}</span>
+                  <button className="draft-btn" onClick={sendChat} disabled={!canSend}>
+                    {busy ? "Working…" : code ? "Send" : "Generate"} <Icon name="arrow" />
+                  </button>
+                </div>
               </div>
             </div>
           </section>
@@ -504,9 +623,15 @@ export function StudioApp() {
             <div className="studio-busy-strip">
               <span className="status-dot busy" />
               <span className="mono">
-                {status === "repairing" ? "Checking part separation" : "Thinking / researching"}
+                {status === "reviewing"
+                  ? "Comparing render to reference"
+                  : status === "repairing"
+                    ? "Checking part separation"
+                    : "Thinking / researching"}
               </span>
-              <span className="mono studio-hint">quality pass · no fast fallback</span>
+              <span className="mono studio-hint">
+                {status === "reviewing" ? "visual quality gate" : "quality pass · no fast fallback"}
+              </span>
             </div>
           ) : null}
 
@@ -525,6 +650,16 @@ export function StudioApp() {
                 {parts.length > 0 && mesh.components !== declaredBodies
                   ? `${mesh.components} connected bod${mesh.components === 1 ? "y" : "ies"} for ${declaredBodies} declared bod${declaredBodies === 1 ? "y" : "ies"}. Ask Cadgo to separate the instances with clearance.`
                   : `${mesh.floating} detached solid${mesh.floating === 1 ? "" : "s"}. Ask Cadgo to connect it to the body.`}
+              </span>
+            </div>
+          ) : null}
+
+          {mesh && bed && bedOverflow.length ? (
+            <div className="studio-print-warning">
+              <Icon name="printer" />
+              <span>
+                Exceeds the {bed.x}×{bed.y}×{bed.z} mm bed on {bedOverflow.map((axis) => `${axis.toUpperCase()}`).join(", ")}.
+                Scale it or ask Cadgo for a split part.
               </span>
             </div>
           ) : null}

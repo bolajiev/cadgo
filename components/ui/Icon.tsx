@@ -48,6 +48,18 @@ const paths: Record<string, React.ReactNode> = {
   undo: <path d="M5.5 4 2.8 6.7l2.7 2.7M3 6.7h6.2a4 4 0 0 1 0 8H7" />,
   redo: <path d="m10.5 4 2.7 2.7-2.7 2.7M13 6.7H6.8a4 4 0 0 0 0 8H9" />,
   folder: <path d="M2 4.5h4l1.4 2H14v6.8H2zM2 4.5V3h4.2" />,
+  image: (
+    <>
+      <rect x="2" y="2.5" width="12" height="11" />
+      <circle cx="5.6" cy="6" r="1.2" />
+      <path d="m2.5 11.5 3.4-3.2 2.5 2.1 1.8-1.5 3.3 2.8" />
+    </>
+  ),
+  printer: (
+    <>
+      <path d="M4 6V2.8h8V6M2.5 6h11v5.5h-11zM4.5 8.5h7v5h-7zM6 11h4" />
+    </>
+  ),
   eye: (
     <>
       <path d="M1.8 8s2.3-3.8 6.2-3.8S14.2 8 14.2 8s-2.3 3.8-6.2 3.8S1.8 8 1.8 8Z" />

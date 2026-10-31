@@ -13,6 +13,7 @@ import {
 import { DEFAULT_EXAMPLE, SCAD_EXAMPLES } from "@/lib/scad/examples";
 import type { OrbitView } from "@/lib/view";
 import { useToast } from "@/lib/store/ui";
+import type { PrintProfile, StudioImage } from "./profile";
 
 export type StudioSource = {
   title: string;
@@ -30,10 +31,11 @@ export type StudioMessage = {
   text: string;
   note?: string;
   sources?: StudioSource[];
+  image?: StudioImage;
   time: string;
 };
 
-export type StudioStatus = "booting" | "idle" | "drafting" | "compiling" | "repairing" | "error";
+export type StudioStatus = "booting" | "idle" | "drafting" | "compiling" | "repairing" | "reviewing" | "error";
 
 type ApiArtifact = {
   title: string;
@@ -68,6 +70,8 @@ type StudioState = {
   compileMs: number;
   prompt: string;
   refine: string;
+  referenceImage: StudioImage | null;
+  printProfile: PrintProfile | null;
   messages: StudioMessage[];
   model: string;
   activeTab: "parameters" | "code";
@@ -85,6 +89,8 @@ type StudioState = {
   refineModel: (message?: string) => Promise<void>;
   setPrompt: (value: string) => void;
   setRefine: (value: string) => void;
+  setReferenceImage: (image: StudioImage | null) => void;
+  setPrintProfile: (profile: PrintProfile | null) => void;
   setParam: (name: string, value: number | boolean) => void;
   applyCode: (code: string) => Promise<void>;
   setCodeDraft: (code: string) => void;
@@ -134,8 +140,9 @@ function message(
   text: string,
   note?: string,
   sources?: StudioSource[],
+  image?: StudioImage,
 ): StudioMessage {
-  return { id: uid(), role, text, note, sources, time: timeNow() };
+  return { id: uid(), role, text, note, sources, image, time: timeNow() };
 }
 
 function makeModelLabel(model?: string) {
@@ -204,6 +211,68 @@ async function repairArtifact(
     parts: normalizeParts(payload.parts, parts),
     sources: Array.isArray(payload.sources) ? payload.sources : [],
   };
+}
+
+async function reviewArtifact(input: {
+  code: string;
+  parts: StudioPart[];
+  prompt: string;
+  profile: PrintProfile | null;
+  referenceImage: string;
+  render: string;
+  metrics: string;
+  sessionIdValue: string;
+}): Promise<ApiArtifact> {
+  const response = await fetch("/api/studio/review", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      code: input.code,
+      parts: input.parts,
+      prompt: input.prompt,
+      profile: input.profile ?? undefined,
+      referenceImage: input.referenceImage,
+      render: input.render,
+      metrics: input.metrics,
+      sessionId: input.sessionIdValue,
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.code) {
+    throw new Error(payload.error ?? "The visual check did not return a model");
+  }
+  return {
+    title: payload.title ?? "Reviewed model",
+    code: payload.code,
+    message: payload.message ?? "Checked the model against the image.",
+    model: payload.model,
+    parts: normalizeParts(payload.parts),
+    sources: [],
+  };
+}
+
+async function captureRender(): Promise<string | null> {
+  if (typeof document === "undefined") return null;
+  let source: HTMLCanvasElement | null = null;
+  const started = Date.now();
+  while (Date.now() - started < 5000) {
+    source = document.querySelector<HTMLCanvasElement>(".studio-stage canvas");
+    if (source && source.width > 10 && source.height > 10) break;
+    source = null;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  if (!source) return null;
+  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  const scale = Math.min(1, 1200 / Math.max(source.width, source.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(source.width * scale));
+  canvas.height = Math.max(1, Math.round(source.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.fillStyle = "#f1eee5";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.82);
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -278,7 +347,7 @@ function geometryIssue(outcome: CompileOutcome, parts: StudioPart[]) {
   return null;
 }
 
-function artifactNote(artifact: ApiArtifact, outcome: CompileOutcome, repaired: number) {
+function artifactNote(artifact: ApiArtifact, outcome: CompileOutcome, repaired: number, visualChecked = false) {
   const label = makeModelLabel(artifact.model) ?? "Design compiler";
   const parts = artifact.parts ?? [];
   const bodyCount = outcome.mesh?.components ?? 0;
@@ -287,6 +356,7 @@ function artifactNote(artifact: ApiArtifact, outcome: CompileOutcome, repaired: 
   if (parts.length > 1) bits.push(`${parts.length} part types`);
   if (parts.length && bodyCount !== expectedBodies(parts)) bits.push("body mismatch");
   if (artifact.sources?.length) bits.push(`${artifact.sources.length} source${artifact.sources.length === 1 ? "" : "s"}`);
+  if (visualChecked) bits.push("visual check");
   if (repaired) bits.push(repaired === 1 ? "quality-repaired" : `quality-repaired ×${repaired}`);
   return bits.join(" · ");
 }
@@ -305,6 +375,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   compileMs: 0,
   prompt: "",
   refine: "",
+  referenceImage: null,
+  printProfile: null,
   messages: [],
   model: "",
   activeTab: "parameters",
@@ -347,6 +419,8 @@ export const useStudio = create<StudioState>((set, get) => ({
         code: parsed.c,
         codeDraft: parsed.c,
         parts: [],
+        referenceImage: null,
+        printProfile: null,
         params: outcome.params,
         values: outcome.values,
         mesh: outcome.mesh,
@@ -373,6 +447,8 @@ export const useStudio = create<StudioState>((set, get) => ({
       code: "",
       codeDraft: "",
       parts: [],
+      referenceImage: null,
+      printProfile: null,
       params: [],
       values: {},
       mesh: null,
@@ -404,6 +480,8 @@ export const useStudio = create<StudioState>((set, get) => ({
       code: clean,
       codeDraft: clean,
       parts: [],
+      referenceImage: null,
+      printProfile: null,
       prompt: "",
       messages: [...get().messages, message("user", `Imported ${name}.scad`)],
     });
@@ -455,6 +533,8 @@ export const useStudio = create<StudioState>((set, get) => ({
       code: example.code,
       codeDraft: example.code,
       parts: [],
+      referenceImage: null,
+      printProfile: null,
       messages: [...get().messages, message("user", example.prompt), message("ai", `${example.title} loaded from the benchbook.`)],
     });
     const outcome = await evaluateCode(example.code);
@@ -479,6 +559,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   generate: async (promptInput) => {
     const prompt = (promptInput ?? get().prompt).trim();
     if (!prompt) return;
+    const image = get().referenceImage;
+    const profile = get().printProfile;
     const token = ++requestSeq;
     currentAbort?.abort();
     currentAbort = new AbortController();
@@ -486,13 +568,13 @@ export const useStudio = create<StudioState>((set, get) => ({
       status: "drafting",
       error: null,
       prompt: "",
-      messages: [...get().messages, message("user", prompt)],
+      messages: [...get().messages, message("user", prompt, undefined, undefined, image ?? undefined)],
     });
     try {
       const response = await fetch("/api/studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, sessionId: sessionId() }),
+        body: JSON.stringify({ prompt, image, profile, sessionId: sessionId() }),
         signal: currentAbort.signal,
       });
       if (token !== requestSeq) return;
@@ -521,6 +603,79 @@ export const useStudio = create<StudioState>((set, get) => ({
           throw new Error(error instanceof Error ? error.message : "The repair pass failed");
         }
         outcome = await evaluateCode(artifact.code);
+      }
+      let visualChecked = false;
+      if (image && outcome.ok && outcome.mesh && outcome.params && outcome.values && token === requestSeq) {
+        const reviewMesh = outcome.mesh;
+        const bounds = reviewMesh.bounds;
+        const dims = [bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1], bounds.max[2] - bounds.min[2]]
+          .map((value) => Math.round(value));
+        set({
+          status: "reviewing",
+          mesh: reviewMesh,
+          params: outcome.params,
+          values: outcome.values,
+          code: artifact.code,
+          codeDraft: artifact.code,
+          title: artifact.title,
+          parts: artifact.parts ?? [],
+          logs: outcome.logs ?? "",
+          compileMs: Math.round(outcome.duration ?? 0),
+          error: null,
+          fitKey: get().fitKey + 1,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 900));
+        const render = await captureRender();
+        if (render && token === requestSeq) {
+          try {
+            const reviewed = await reviewArtifact({
+              code: artifact.code,
+              parts: artifact.parts ?? [],
+              prompt,
+              profile,
+              referenceImage: image.dataUrl,
+              render,
+              metrics: `Envelope ${dims.join("x")} mm; ${reviewMesh.components} connected bodies; ${reviewMesh.triangles} triangles; ${(artifact.parts ?? []).length} part types.`,
+              sessionIdValue: sessionId(),
+            });
+            visualChecked = true;
+            if (reviewed.code && reviewed.code !== artifact.code) {
+              const previous = artifact;
+              const previousOutcome = outcome;
+              artifact = {
+                ...artifact,
+                code: reviewed.code,
+                title: reviewed.title || artifact.title,
+                message: reviewed.message || artifact.message,
+                parts: reviewed.parts?.length ? reviewed.parts : artifact.parts,
+              };
+              set({ status: "compiling" });
+              outcome = await evaluateCode(artifact.code);
+              let visualRepairs = 0;
+              while (geometryIssue(outcome, artifact.parts ?? []) && visualRepairs < 1) {
+                if (token !== requestSeq) return;
+                const issue = geometryIssue(outcome, artifact.parts ?? []);
+                if (!issue) break;
+                visualRepairs++;
+                repaired++;
+                set({ status: "repairing" });
+                artifact = await repairArtifact(artifact.code, issue, artifact.parts ?? [], sessionId());
+                outcome = await evaluateCode(artifact.code);
+              }
+              if (geometryIssue(outcome, artifact.parts ?? [])) {
+                artifact = {
+                  ...previous,
+                  message: `${reviewed.message} Kept the compiled version because the visual correction did not pass the body check.`,
+                };
+                outcome = previousOutcome;
+              }
+            } else if (reviewed.message) {
+              artifact = { ...artifact, message: reviewed.message };
+            }
+          } catch {
+            // A failed visual check should not discard a valid model.
+          }
+        }
       }
       if (token !== requestSeq) return;
       if (!outcome.ok || !outcome.mesh || !outcome.params || !outcome.values) {
@@ -556,7 +711,7 @@ export const useStudio = create<StudioState>((set, get) => ({
           message(
             "ai",
             artifact.message,
-            artifactNote(artifact, outcome, repaired),
+            artifactNote(artifact, outcome, repaired, visualChecked),
             artifact.sources,
           ),
         ],
@@ -660,6 +815,8 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   setPrompt: (value) => set({ prompt: value }),
   setRefine: (value) => set({ refine: value }),
+  setReferenceImage: (referenceImage) => set({ referenceImage }),
+  setPrintProfile: (printProfile) => set({ printProfile }),
   setCodeDraft: (value) => set({ codeDraft: value }),
 
   setParam: (name, value) => {

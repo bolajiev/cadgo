@@ -14,11 +14,13 @@ CAD remains expert software, while most AI 3D tools stop at a mesh. Cadgo gives 
 
 ## What was built
 
-- Prompt → parametric OpenSCAD source → local WASM mesh → interactive 3D.
+- Image or prompt → agent setup (purpose, printer, bed) → research → parametric OpenSCAD → local WASM mesh → interactive 3D.
+- A render-versus-reference visual check, with invalid corrections rejected by the body-count gate.
 - Chat feedback edits the current source in place; the reply reports changed lines instead of starting over.
 - Top-level Customizer parameters exposed as live "Dimensions" sliders; slider edits rewrite the source and recompile locally.
 - Optional "Dimensions" and "Source" inspector panels; the default stage stays open and uncluttered.
-- A planner decomposes the object into real, separately manufacturable parts and lists the standards to verify; the server researches those references and shows the sources.
+- A planner decomposes the object into real, separately manufacturable parts and lists the standards and printer to verify; the server researches those references and shows the sources.
+- For 3D printing, the agent asks for the printer and bed size, researches the build volume and FDM constraints, and checks the compiled envelope against the bed.
 - Compiler-error repair and a body-count check: every declared part must be its own watertight body, so the result is a real assembly rather than a fused mesh.
 - Four complete benchbook studies: knurled knob, honeycomb bracket, twisted hex vase, spur gear.
 - Direct STL download of the current edited part; SCAD export and compressed share links.
@@ -30,7 +32,7 @@ The engine is not specific to the four studies. Any OpenSCAD source can be impor
 
 ## How AI is used
 
-The system is a **planning engineer + design compiler**, not a mesh generator. A first model call decomposes the brief into real parts, dimensions and a list of standards to verify. The server researches those references through a guarded web lookup and attaches the source links. A second model call writes a complete OpenSCAD program plus a bill of parts. The browser compiles it with OpenSCAD WASM; the compiler log, the connected-body count and the declared part count feed a repair pass. The gate is strict: distinct parts must remain separate bodies with clearance, and a declared part cannot disappear into a fused solid. In chat, the model receives the current source and applies the smallest coherent change; the UI reports changed lines and keeps the part manifest visible. The app opens with no preview or starter solid; a model appears only when the user generates one or explicitly opens a bench study. **New page** opens a fresh blank studio in a new tab. The model never executes code on the server. Parameters and direct code edits stay local and deterministic.
+The system is a **planning engineer + design compiler**, not a mesh generator. A first model call sees the image/brief plus the print profile and decomposes the object into real parts, dimensions, unknowns and a research list. The server researches those references, including the printer's build volume, through a guarded web lookup and attaches the source links. A second model call writes a complete OpenSCAD program plus a bill of parts. The browser compiles it with OpenSCAD WASM; the compiler log, connected-body count and declared part count feed a repair pass. The browser then renders the model and sends the render plus the reference image to a visual-check pass; a correction that breaks the body check is rejected. The gate is strict: distinct parts must remain separate bodies with clearance, and a declared part cannot disappear into a fused solid. In chat, the model receives the current source and applies the smallest coherent change; the UI reports changed lines and keeps the part manifest visible. The app opens with no preview or starter solid; a model appears only when the user generates one or explicitly opens a bench study. **New page** opens a fresh blank studio in a new tab. The model never executes code on the server. Parameters and direct code edits stay local and deterministic.
 
 ## Demo quality
 
@@ -41,15 +43,15 @@ Cadgo opens on a blank new part. The user can type a brief, import a `.scad`, or
 - Next.js 16, React 19, React Three Fiber / three.js.
 - OpenSCAD 2025 WebAssembly in a module worker: STL/OFF generation, source compile, local parameter rebuilds.
 - Customizer-comment parameter extraction; source-preserving parameter updates.
-- OpenCode Go OpenAI-compatible endpoint: DeepSeek V4.1 Flash planner/writer, no model fallback.
+- OpenCode Go OpenAI-compatible endpoint: DeepSeek V4.1 Flash planner/writer/vision, no model fallback.
 - Compiler repair, connected-body counting and declared-part body checks.
-- SSRF-guarded web research with a public-source allow path and visible citations.
+- Image reference, printer/bed intake, visual render critique, and SSRF-guarded web research with visible citations.
 - Server-only API key, per-IP rate limits, no account, browser-local share links.
 
 ## Links
 
 - Repository: https://github.com/bolajiev/cadgo
-- Live demo: https://cadgo.vercel.app
+- Live demo: https://cadgo-ashy.vercel.app
 - Video: `<add video URL>`
 
 ## Credits
