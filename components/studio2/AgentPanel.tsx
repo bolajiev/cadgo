@@ -34,6 +34,7 @@ export function AgentPanel() {
   const removeReferenceImage = useStudioV2((state) => state.removeReferenceImage);
   const printProfile = useStudioV2((state) => state.printProfile);
   const setPrintProfile = useStudioV2((state) => state.setPrintProfile);
+  const lastUser = [...chat].reverse().find((entry) => entry.role === "user");
   const [draft, setDraft] = useState("");
   const [showSetup, setShowSetup] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -219,12 +220,15 @@ export function AgentPanel() {
                 if (/budget|steps/i.test(error)) {
                   useStudioV2.setState({ agentBudget: budget + 40, agentError: null, agentStatus: "idle" });
                   setNotice("Agent budget extended by 40 steps.");
+                } else if (lastUser) {
+                  useStudioV2.setState({ agentError: null, agentStatus: "idle" });
+                  void sendAgentMessage(lastUser.text);
                 } else {
                   useStudioV2.setState({ agentError: null, agentStatus: "idle" });
                 }
               }}
             >
-              {/budget|steps/i.test(error) ? "Extend +40" : "Dismiss"}
+              {/budget|steps/i.test(error) ? "Extend +40" : lastUser ? "Retry" : "Dismiss"}
             </button>
           </div>
         ) : null}

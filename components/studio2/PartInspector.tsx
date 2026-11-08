@@ -160,7 +160,10 @@ function MaterialEditor({
         kind: "update_instance",
         payload: {
           instanceId: instance.id,
-          patch: { material: instance.material ?? base, materialMode: nextMode },
+          patch: {
+            material: nextMode === "override" ? instance.material ?? base : instance.material,
+            materialMode: nextMode,
+          },
         },
         targetRevision: current.revision,
         label: "Set material mode",
