@@ -1,7 +1,7 @@
 # Cadgo demo script
 
 **Recorded cut:** `docs/cadgo-demo.mp4` — 1:21, 1280×720, no voice track.
-**Live URL:** `https://cadgo-v2.vercel.app/studio`
+**Live URL:** `https://omotalk.chat/studio`
 
 The recording is a real screen capture, not a motion mock-up. It shows a 15-part, 12-joint humanoid walk cycle, then a live agent edit with the thinking stream and local compile. Record your voice over it, or use this as the shot plan for a new take.
 

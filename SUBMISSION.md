@@ -59,7 +59,7 @@ The core journey fits on one screen: describe a part or scene, watch the agent b
 ## Links
 
 - Repository: https://github.com/bolajiev/cadgo
-- Live studio: https://cadgo-v2.vercel.app/studio
+- Live studio: https://omotalk.chat/studio
 
 ## Credits
 
