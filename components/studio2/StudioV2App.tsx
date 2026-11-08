@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { Modal } from "@/components/ui/Modal";
 import { useStudioV2 } from "@/lib/studio/v2/store";
 import { assemblyBounds, assemblyStl, groupVisible, placedVariants } from "@/lib/studio/v2/geometry";
-import { buildPartStlBundle, buildSceneGlb } from "@/lib/studio/v2/export";
+import { buildPartStlBundle, buildSceneGlb, type SceneGlbOptions } from "@/lib/studio/v2/export";
 import { buildScadBundle } from "@/lib/studio/v2/bundle";
 import { encodeDocumentShare, serializeDocument } from "@/lib/studio/document/serialize";
 import { formatNumber } from "@/lib/format";
@@ -35,6 +36,7 @@ function closeMenu(event: React.MouseEvent<HTMLButtonElement>) {
 function ExportMenu({
   onStl,
   onGlb,
+  onGlbOptions,
   onParts,
   onScad,
   onJson,
@@ -42,6 +44,7 @@ function ExportMenu({
 }: {
   onStl: () => void;
   onGlb: () => void;
+  onGlbOptions: () => void;
   onParts: () => void;
   onScad: () => void;
   onJson: () => void;
@@ -59,6 +62,9 @@ function ExportMenu({
         </button>
         <button className="menu-item" onClick={(event) => { onGlb(); closeMenu(event); }}>
           <span>Scene GLB</span><span className="mono">.glb</span>
+        </button>
+        <button className="menu-item" onClick={(event) => { onGlbOptions(); closeMenu(event); }}>
+          <span>GLB animation options</span><span className="mono">settings</span>
         </button>
         <button className="menu-item" onClick={(event) => { onParts(); closeMenu(event); }}>
           <span>Part STLs</span><span className="mono">.zip</span>
@@ -97,6 +103,10 @@ export function StudioV2App() {
   const pendingQuestion = useStudioV2((state) => state.pendingQuestion);
   const [title, setTitleDraft] = useState(document.name);
   const [leftTab, setLeftTab] = useState<"model" | "agent">("model");
+  const [glbOptionsOpen, setGlbOptionsOpen] = useState(false);
+  const [glbAnimations, setGlbAnimations] = useState(true);
+  const [glbSamples, setGlbSamples] = useState(36);
+  const [glbDuration, setGlbDuration] = useState<"auto" | "1" | "2" | "4" | "8">("auto");
   const [leftWidth, setLeftWidth] = useState(340);
   const [rightWidth, setRightWidth] = useState(344);
   const leftWidthRef = useRef(leftWidth);
@@ -261,13 +271,13 @@ export function StudioV2App() {
     setNotice("Assembly STL downloaded · millimetres.");
   };
 
-  const downloadGlb = async () => {
+  const exportGlb = async (options?: SceneGlbOptions) => {
     if (compileIssues.length) {
       setNotice(compileIssues.slice(0, 2).join("; "));
       return;
     }
     try {
-      const result = await buildSceneGlb(document, variants, instanceVariants);
+      const result = await buildSceneGlb(document, variants, instanceVariants, options);
       downloadBlob(
         new Blob([result.buffer], { type: "model/gltf-binary" }),
         `${safeName(document.name)}.glb`,
@@ -275,12 +285,29 @@ export function StudioV2App() {
       setNotice(
         result.animationCount
           ? `Scene GLB downloaded · ${result.animationCount} driver animation${result.animationCount === 1 ? "" : "s"} included.`
-          : "Scene GLB downloaded · static scene (no drivers).",
+          : options?.animations === false
+            ? "Scene GLB downloaded · static export."
+            : "Scene GLB downloaded · static scene (no drivers).",
       );
     } catch (error) {
       console.error("Cadgo scene GLB export failed", error);
       setNotice(error instanceof Error ? error.message : "Scene GLB export failed.");
     }
+  };
+
+  const downloadGlb = () => void exportGlb();
+
+  const downloadGlbWithOptions = () => {
+    if (compileIssues.length) {
+      setNotice(compileIssues.slice(0, 2).join("; "));
+      return;
+    }
+    setGlbOptionsOpen(false);
+    void exportGlb({
+      animations: glbAnimations,
+      samples: glbSamples,
+      duration: glbDuration === "auto" ? undefined : Number(glbDuration),
+    });
   };
 
   const downloadPartStls = () => {
@@ -410,7 +437,8 @@ export function StudioV2App() {
           </button>
           <ExportMenu
             onStl={downloadStl}
-            onGlb={() => void downloadGlb()}
+            onGlb={downloadGlb}
+            onGlbOptions={() => setGlbOptionsOpen(true)}
             onParts={downloadPartStls}
             onScad={downloadScad}
             onJson={downloadDocument}
@@ -478,6 +506,63 @@ export function StudioV2App() {
         />
         <PartInspector />
       </main>
+
+      {glbOptionsOpen ? (
+        <Modal
+          title="Scene GLB options"
+          eyebrow="Export"
+          onClose={() => setGlbOptionsOpen(false)}
+          actions={(
+            <>
+              <button className="btn" onClick={() => setGlbOptionsOpen(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={downloadGlbWithOptions} disabled={compileIssues.length > 0}>
+                Export GLB
+              </button>
+            </>
+          )}
+        >
+          <div className="v2-export-options">
+            <label className="v2-toggle-row">
+              <input type="checkbox" checked={glbAnimations} onChange={(event) => setGlbAnimations(event.target.checked)} />
+              Include driver animations
+            </label>
+            <label className="v2-field">
+              <span>Animation samples</span>
+              <input
+                className="v2-input mono"
+                type="number"
+                min={4}
+                max={120}
+                step={1}
+                value={glbSamples}
+                disabled={!glbAnimations}
+                onChange={(event) => setGlbSamples(Math.max(4, Math.min(120, Number(event.target.value) || 36)))}
+              />
+            </label>
+            <label className="v2-field">
+              <span>Clip duration</span>
+              <select
+                className="v2-input mono"
+                value={glbDuration}
+                disabled={!glbAnimations}
+                onChange={(event) => setGlbDuration(event.target.value as typeof glbDuration)}
+              >
+                <option value="auto">Auto</option>
+                <option value="1">1 s</option>
+                <option value="2">2 s</option>
+                <option value="4">4 s</option>
+                <option value="8">8 s</option>
+              </select>
+            </label>
+            <p className="v2-muted">
+              Each driver becomes one glTF animation clip. A static export contains no animation channels.
+            </p>
+            {compileIssues.length ? <p className="v2-audit-warn">{compileIssues.slice(0, 2).join("; ")}</p> : null}
+          </div>
+        </Modal>
+      ) : null}
 
       {notice ? (
         <div className="v2-notice">

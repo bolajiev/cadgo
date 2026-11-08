@@ -126,6 +126,24 @@ test("scene export produces a valid GLB and a per-part STL archive", async ({ pa
   );
   expect(archive["assembly.stl"].byteLength).toBeGreaterThan(84);
 
+  await page.locator(".v2-export summary").click();
+  await page.locator(".v2-export .menu-item").filter({ hasText: "GLB animation options" }).click();
+  const dialog = page.getByRole("dialog", { name: "Scene GLB options" });
+  await expect(dialog).toBeVisible();
+  await dialog.locator('input[type="checkbox"]').click();
+  const [staticDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    dialog.locator(".modal-actions button").filter({ hasText: "Export GLB" }).click(),
+  ]);
+  const staticPath = await staticDownload.path();
+  expect(staticPath).toBeTruthy();
+  const staticGlb = readFileSync(staticPath as string);
+  const staticJsonLength = staticGlb.readUInt32LE(12);
+  const staticGltf = JSON.parse(staticGlb.subarray(20, 20 + staticJsonLength).toString("utf8").trim()) as {
+    animations?: unknown[];
+  };
+  expect(staticGltf.animations ?? []).toHaveLength(0);
+
   expect(pageErrors).toEqual([]);
 });
 

@@ -30,7 +30,7 @@ CAD-grade parametric editing stays the core: named dimensions, editable source, 
 - **Image and print setup.** Attach up to three reference views; set purpose, printer, bed, material and supports. The print profile travels with the prompt and gates STL export on bed overflow.
 - **Inspection.** The agent requests orthographic views; the browser renders the assembly and returns it to the model as vision evidence.
 - **Motion.** Joints and drivers are the working logic for mechanisms and scenes: expression-driven revolute/prismatic/link joints, with a whole group as the joint target so a rotor or fan spins intact without separating its blades. Select a part or group and play its driver in the inspector, or double-click a moving part in the stage. Concept labs include a V8 and a transparent rotary mechanism.
-- **Export and import.** Exports are assembly STL, a Scene GLB with the group hierarchy, resolved materials and driver animation clips, a Part STLs ZIP (one transformed STL per visible instance plus the merged assembly), a ZIP with one editable SCAD per definition plus the assembly manifest and native document, `.cadgo.json`, and compressed share links. Import `.scad` as a new part or `.cadgo.json` to restore a complete assembly.
+- **Export and import.** Exports are assembly STL, a Scene GLB with the group hierarchy, resolved materials, driver animation clips and options for samples, duration and static export, a Part STLs ZIP (one transformed STL per visible instance plus the merged assembly), a ZIP with one editable SCAD per definition plus the assembly manifest and native document, `.cadgo.json`, and compressed share links. Import `.scad` as a new part or `.cadgo.json` to restore a complete assembly.
 - **Benchbook.** A mounting plate, honeycomb angle bracket, knurled knob and spur gear, all fully parametric. Concept labs add a driven wind turbine, a lighthouse scene, the V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle. A narration/shot script for the demo is in `DEMO_SCRIPT.md`.
 
 ![The assembly tree and property inspector](docs/studio-panel.png)
@@ -103,7 +103,7 @@ npm run build
 4. Open the **Agent** tab and ask: *“Add a 6 mm hole and make the plate 5 mm thick.”* Edit another part while it works.
 5. Attach reference views and open **Print setup**; the profile goes with the next agent message and gates STL export.
 6. Import a `.scad` as a new part, or import a previously exported `.cadgo.json`.
-7. Open **Export** for assembly STL, Scene GLB, Part STLs, the SCAD ZIP bundle, the Cadgo document or a share link.
+7. Open **Export** for assembly STL, Scene GLB (with animation options), Part STLs, the SCAD ZIP bundle, the Cadgo document or a share link.
 8. Optional: **Benchbook → Concept labs** for the wind turbine, lighthouse scene, V8 and transparent rotary mechanism.
 
 ## Limits

@@ -6463,6 +6463,20 @@ a {
   line-height: 1.4;
 }
 
+.v2-export-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.v2-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
 .v2-param {
   margin-bottom: 13px;
 }
