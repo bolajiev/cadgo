@@ -25,6 +25,7 @@ CAD-grade parametric editing stays the core: named dimensions, editable source, 
 - **Real CAD interaction.** Orthographic view, standard views, axis gizmo, overall dimension lines, translate/rotate gizmo, isolate, and a per-part property inspector.
 - **Per-part revisions and conflicts.** Every agent mutation carries the revision it read. If you changed the same part first, your edit wins and the agent receives a conflict to re-read and rebase.
 - **Per-instance overrides.** Change a parameter on one placed instance and it compiles a separate variant; the shared definition stays untouched.
+- **Material editing.** Source-colour and material-override modes, with colour, metalness, roughness and opacity per definition or instance.
 - **Local compile pool.** Two OpenSCAD WASM workers compile definitions in parallel; variants are cached by source + parameter hash. Failed parts keep the last good mesh and expose the compiler log.
 - **Image and print setup.** Attach up to three reference views; set purpose, printer, bed, material and supports. The print profile travels with the prompt and gates STL export on bed overflow.
 - **Inspection.** The agent requests orthographic views; the browser renders the assembly and returns it to the model as vision evidence.

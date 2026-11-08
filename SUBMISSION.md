@@ -19,6 +19,7 @@ CAD is still expert software, and most AI 3D tools stop at a mesh. Cadgo gives h
 - Local OpenSCAD WASM compile pool with per-variant hash caching, progressive loading, last-good meshes, per-part metrics and compiler logs.
 - CAD workspace: orthographic stage, standard views, axis gizmo, overall dimension lines, assembly tree, 3D selection, translate/rotate gizmo, isolate, group transforms and a per-part inspector.
 - Per-instance parameter overrides compiled as separate variants.
+- Material inspector with source-colour and override modes, colour, metalness, roughness and opacity per definition or instance.
 - Image reference (up to three views) and optional print setup (purpose, printer, bed, material, supports); the print profile gates STL export on bed overflow.
 - Expression-driven motion as working logic for mechanisms and scenes: revolute, prismatic and link joints, including group joints so a complete rotor/fan subassembly spins intact; crank-angle and rotor-angle drivers; concept labs for a driven wind turbine, a lighthouse scene, a V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle.
 - Inspection sheets rendered from the assembled scene and returned to the agent as vision evidence.
@@ -40,7 +41,7 @@ The system is an **agentic 3D assembly editor**. DeepSeek V4.1 Flash decides whe
 
 - Recorded demo: `docs/cadgo-demo.mp4` (1:21, 1280×720, silent) with captions in `docs/cadgo-demo.srt`. Narration, shot list and prompt cards are in `DEMO_SCRIPT.md`.
 
-The core journey fits on one screen: describe a part or scene, watch the agent build or edit it, adjust dimensions or source in the inspector, orbit or use standard views, drag the gizmo, then export STL, Scene GLB, Part STLs, SCAD and JSON. The agent remains usable while the user edits; questions and conflicts are non-blocking. Concept labs exercise larger assemblies, a driven wind turbine, motion and transparent materials.
+The core journey fits on one screen: describe a part or scene, watch the agent build or edit it, adjust dimensions or source in the inspector, orbit or use standard views, drag the gizmo, then export STL, Scene GLB, Part STLs, SCAD and JSON. The agent remains usable while the user edits; questions and conflicts are non-blocking. Concept labs exercise larger assemblies, a driven wind turbine, a lighthouse scene, motion and transparent materials.
 
 ## Technical notes
 
