@@ -292,3 +292,18 @@ test("starter library examples load as single watertight parts", async ({ page }
 
   expect(pageErrors).toEqual([]);
 });
+
+test("landing page opens the studio", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/");
+  await expect(page.locator(".ldg-hero h1")).toContainText("Describe it.");
+  await expect(page.locator(".ldg-hero h1")).toContainText("Export it.");
+  await expect(page.locator(".ldg-card")).toHaveCount(3);
+  await expect(page.locator(".ldg-steps li")).toHaveCount(4);
+  await page.getByRole("link", { name: /Open the studio/ }).first().click();
+  await expect(page.locator(".v2-tree")).toBeVisible({ timeout: 60_000 });
+  expect(page.url()).toContain("/studio");
+  expect(pageErrors).toEqual([]);
+});

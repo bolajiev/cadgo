@@ -6,8 +6,8 @@ export const metadata: Metadata = {
   description:
     "Describe a part, a mechanical assembly, or a concept 3D scene. Get editable, parametric CAD with local OpenSCAD compilation, an agent that works alongside you, and standard STL/SCAD/JSON exports.",
   openGraph: {
-    title: "Cadgo — AI CAD assembly studio",
-    description: "From a sentence to editable parametric CAD.",
+    title: "Cadgo — AI 3D assembly studio",
+    description: "From a sentence to editable parametric 3D assemblies and concept scenes.",
     type: "website",
   },
 };

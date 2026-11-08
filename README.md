@@ -6,7 +6,8 @@ Cadgo is a browser-based AI 3D assembly studio for mechanical assemblies and con
 
 CAD-grade parametric editing stays the core: named dimensions, editable source, separate bodies and standard exports.
 
-**Live demo:** https://cadgo-3d.vercel.app/studio  
+**Live studio:** https://cadgo-3d.vercel.app/studio  
+**Landing page:** https://cadgo-3d.vercel.app/  
 **Repository:** https://github.com/bolajiev/cadgo  
 **Hackathon:** Victoria VR AI Builder Hackathon 2026 · **AI-assisted 3D editing**
 
@@ -67,7 +68,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000/studio`. The root redirects to the studio.
+Open `http://localhost:3000/` for the landing page and `/studio` for the assembly studio.
 
 | variable | default | purpose |
 |---|---|---|
