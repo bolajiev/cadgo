@@ -31,8 +31,6 @@ export function AgentPanel() {
   const referenceImages = useStudioV2((state) => state.referenceImages);
   const addReferenceImage = useStudioV2((state) => state.addReferenceImage);
   const removeReferenceImage = useStudioV2((state) => state.removeReferenceImage);
-  const printProfile = useStudioV2((state) => state.printProfile);
-  const setPrintSetupOpen = useStudioV2((state) => state.setPrintSetupOpen);
   const lastUser = [...chat].reverse().find((entry) => entry.role === "user");
   const [draft, setDraft] = useState("");
   const [elapsed, setElapsed] = useState(0);
@@ -50,15 +48,6 @@ export function AgentPanel() {
   const messagesRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
 
-  const profileLabel = printProfile
-    ? printProfile.purpose === "3d-print"
-      ? `Print${printProfile.bed ? ` · ${printProfile.bed.x}×${printProfile.bed.y}×${printProfile.bed.z}` : ""}`
-      : printProfile.purpose === "visualization"
-        ? "Visualization"
-        : printProfile.purpose === "cnc"
-          ? "CNC / laser"
-          : "Assembly"
-    : "Print setup";
 
   const attachImages = async (files: File[] | FileList | null) => {
     if (!files?.length) return;
@@ -262,13 +251,6 @@ export function AgentPanel() {
             title="Attach a reference image"
           >
             <Icon name="image" size={11} /> Image
-          </button>
-          <button
-            className={`v2-agent-tool ${printProfile ? "active" : ""}`}
-            onClick={() => setPrintSetupOpen(true)}
-            title="Set print purpose, printer and bed"
-          >
-            <Icon name="printer" size={11} /> {profileLabel}
           </button>
           <input
             ref={imageRef}

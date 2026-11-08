@@ -21,7 +21,7 @@ CAD is still expert software, and most AI 3D tools stop at a mesh. Cadgo gives h
 - Per-instance parameter overrides compiled as separate variants.
 - Material inspector with source-colour and override modes, colour, metalness, roughness and opacity per definition or instance.
 - Print check from the compiled mesh: watertightness, overhang against a configurable limit, bed fit, solid volume and a material-density mass estimate. The same report gates STL export.
-- Image reference (up to three views) and optional print setup (purpose, printer, bed, material, supports); the print profile gates STL export on bed overflow.
+- Image reference (up to three views) and optional print setup (purpose, printer, bed, material, supports, overhang limit), available from the print-check panel; the profile gates STL export on bed overflow.
 - Expression-driven motion as working logic for mechanisms and scenes: revolute, prismatic and link joints, including group joints so a complete rotor/fan subassembly spins intact; crank-angle and rotor-angle drivers; contextual motion (select a part or group and play its driver, or double-click a moving part); concept labs for a driven wind turbine, a lighthouse scene, a V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle.
 - Inspection sheets rendered from the assembled scene and returned to the agent as vision evidence.
 - Exports: assembly STL, Scene GLB with the group hierarchy, resolved materials, driver animation clips and options for samples, duration and static export, a Part STLs ZIP with one transformed STL per visible instance plus the merged assembly, a ZIP with one editable SCAD per definition plus the assembly manifest and native document, plus `.cadgo.json`. Import `.scad` or `.cadgo.json`.

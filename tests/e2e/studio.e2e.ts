@@ -181,6 +181,9 @@ test("material controls switch between source colours and an instance override",
   await expect(source).toHaveClass(/active/);
   await expect(colour).toBeDisabled();
 
+  await page.locator("canvas").click({ position: { x: 24, y: 320 } });
+  await expect(page.locator(".v2-inspector")).toHaveCount(0);
+
   expect(pageErrors).toEqual([]);
 });
 
@@ -235,10 +238,7 @@ test("print check uses a real print profile and reports fit and watertightness",
   await page.locator(".v2-export summary").click();
   await page.locator(".v2-export .menu-item").filter({ hasText: "Print check" }).click();
   await expect(page.getByRole("dialog", { name: "Print check" })).toContainText("Set a 3D printing profile");
-  await page.getByRole("dialog", { name: "Print check" }).locator(".modal-actions button").filter({ hasText: "Close" }).click();
-
-  await page.locator(".v2-left-tab").filter({ hasText: "Agent" }).click();
-  await page.locator(".v2-agent-tool").filter({ hasText: "Print setup" }).click();
+  await page.getByRole("dialog", { name: "Print check" }).locator(".modal-actions button").filter({ hasText: "Edit print setup" }).click();
   await expect(page.locator(".v2-setup-overlay")).toBeVisible();
   const bed = async (axis: "X" | "Y" | "Z", value: string) => {
     const field = page.locator(".studio-setup-fields label").filter({ hasText: `Bed ${axis}` });

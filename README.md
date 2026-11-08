@@ -27,7 +27,7 @@ CAD-grade parametric editing stays the core: named dimensions, editable source, 
 - **Per-instance overrides.** Change a parameter on one placed instance and it compiles a separate variant; the shared definition stays untouched.
 - **Material editing.** Source-colour and material-override modes, with colour, metalness, roughness and opacity per definition or instance.
 - **Local compile pool.** Two OpenSCAD WASM workers compile definitions in parallel; variants are cached by source + parameter hash. Failed parts keep the last good mesh and expose the compiler log.
-- **Image and print setup.** Attach up to three reference views; set purpose, printer, bed, material and supports. The print profile travels with the prompt and gates STL export on bed overflow.
+- **Image and print setup.** Attach up to three reference views; open **Print check → Edit print setup** to set purpose, printer, bed, material, supports and the overhang warning limit. The print profile gates STL export and drives the print check.
 - **Inspection.** The agent requests orthographic views; the browser renders the assembly and returns it to the model as vision evidence.
 - **Motion.** Joints and drivers are the working logic for mechanisms and scenes: expression-driven revolute/prismatic/link joints, with a whole group as the joint target so a rotor or fan spins intact without separating its blades. Select a part or group and play its driver in the inspector, or double-click a moving part in the stage. Concept labs include a V8 and a transparent rotary mechanism.
 - **Print check.** Real compiled-mesh checks: watertightness, overhang percentage against a configurable limit, bed fit, solid volume and a material-density mass estimate. The same report gates STL export. Wall thickness and slicer time are not measured.
@@ -102,7 +102,7 @@ npm run build
 2. Click the part in the tree or stage; drag a **Part dimensions** slider and watch the local rebuild.
 3. Use the translate/rotate gizmo, isolate the part, and undo the edit.
 4. Open the **Agent** tab and ask: *“Add a 6 mm hole and make the plate 5 mm thick.”* Edit another part while it works.
-5. Attach reference views and open **Print setup**; the profile goes with the next agent message and gates STL export.
+5. Attach reference views; open **Print check → Edit print setup** to set the profile; it gates STL export and the print check.
 6. Import a `.scad` as a new part, or import a previously exported `.cadgo.json`.
 7. Open **Export** for assembly STL, Scene GLB (with animation options), Part STLs, the SCAD ZIP bundle, the Cadgo document or a share link.
 8. Optional: **Benchbook → Concept labs** for the wind turbine, lighthouse scene, V8 and transparent rotary mechanism.

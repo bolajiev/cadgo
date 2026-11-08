@@ -115,6 +115,10 @@ export function StudioV2App() {
   const referenceImages = useStudioV2((state) => state.referenceImages);
   const agentStatus = useStudioV2((state) => state.agentStatus);
   const pendingQuestion = useStudioV2((state) => state.pendingQuestion);
+  const selectedInstanceId = useStudioV2((state) => state.selectedInstanceId);
+  const selectedDefinitionId = useStudioV2((state) => state.selectedDefinitionId);
+  const selectedGroupId = useStudioV2((state) => state.selectedGroupId);
+  const hasSelection = Boolean(selectedInstanceId || selectedDefinitionId || selectedGroupId);
   const [title, setTitleDraft] = useState(document.name);
   const [leftTab, setLeftTab] = useState<"model" | "agent">("model");
   const [glbOptionsOpen, setGlbOptionsOpen] = useState(false);
@@ -453,7 +457,7 @@ export function StudioV2App() {
       </header>
 
       <main
-        className="v2-main"
+        className={`v2-main ${hasSelection ? "" : "v2-main--no-inspector"}`}
         style={
           {
             "--v2-left-width": `${leftWidth}px`,
@@ -491,15 +495,19 @@ export function StudioV2App() {
           onDoubleClick={() => resetWidth("left")}
         />
         <AssemblyStage />
-        <div
-          className="v2-splitter"
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize inspector panel"
-          onPointerDown={beginResize("right")}
-          onDoubleClick={() => resetWidth("right")}
-        />
-        <PartInspector />
+        {hasSelection ? (
+          <>
+            <div
+              className="v2-splitter"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize inspector panel"
+              onPointerDown={beginResize("right")}
+              onDoubleClick={() => resetWidth("right")}
+            />
+            <PartInspector />
+          </>
+        ) : null}
       </main>
 
       {glbOptionsOpen ? (
