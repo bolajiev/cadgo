@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { auditParameterization } from "../lib/scad/audit";
+import { SCAD_EXAMPLES } from "../lib/scad/examples";
 
 describe("parameterization audit", () => {
   it("passes a fully parametric source", () => {
@@ -28,6 +29,32 @@ module body() {
     expect(result.ok).toBe(false);
     expect(result.issues.some((issue) => issue.value === "12")).toBe(true);
     expect(result.issues.some((issue) => issue.value === "6")).toBe(true);
+  });
+
+  it("flags literals in top-level geometry calls", () => {
+    const result = auditParameterization(`
+width = 20; // [10:40]
+cube([width, 12, 6], center = true);
+`);
+    expect(result.ok).toBe(false);
+    expect(result.issues.some((issue) => issue.value === "12")).toBe(true);
+  });
+
+  it("rejects external includes", () => {
+    const result = auditParameterization(`
+width = 20; // [10:40]
+include <rounded.scad>
+cube([width, width, width], center = true);
+`);
+    expect(result.ok).toBe(false);
+    expect(result.issues.some((issue) => issue.value === "external include")).toBe(true);
+  });
+
+  it("passes every benchbook study", () => {
+    for (const example of SCAD_EXAMPLES) {
+      const result = auditParameterization(example.code);
+      expect(result.ok, `${example.title}: ${result.message}`).toBe(true);
+    }
   });
 
   it("ignores colour channels and allowed invariants", () => {

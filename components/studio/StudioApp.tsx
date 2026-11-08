@@ -16,11 +16,11 @@ import { PrintSetup } from "./PrintSetup";
 function BrandMark() {
   return (
     <svg width="27" height="27" viewBox="0 0 27 27" aria-hidden="true">
-      <rect width="27" height="27" fill="#191816" />
-      <path d="M7 19.5 17.5 8.5" stroke="#f1eee5" strokeWidth="1.1" />
-      <circle cx="7" cy="19.5" r="2.8" fill="#191816" stroke="#f1eee5" strokeWidth="1.1" />
-      <circle cx="17.5" cy="8.5" r="2.8" fill="#191816" stroke="#f1eee5" strokeWidth="1.1" />
-      <circle cx="21.5" cy="20" r="1.5" fill="#c4472a" />
+      <rect width="27" height="27" rx="1" fill="#111318" stroke="#3d3a44" />
+      <path d="M7 19.5 17.5 8.5" stroke="#f5f2f4" strokeWidth="1.1" />
+      <circle cx="7" cy="19.5" r="2.8" fill="#111318" stroke="#f5f2f4" strokeWidth="1.1" />
+      <circle cx="17.5" cy="8.5" r="2.8" fill="#111318" stroke="#f5f2f4" strokeWidth="1.1" />
+      <circle cx="21.5" cy="20" r="1.5" fill="#c8ff4a" />
     </svg>
   );
 }
@@ -30,7 +30,7 @@ function statusLabel(status: string) {
   if (status === "drafting") return "Thinking";
   if (status === "compiling") return "Building";
   if (status === "repairing") return "Checking";
-  if (status === "reviewing") return "Visual check";
+  if (status === "reviewing") return "Inspecting";
   if (status === "error") return "Needs attention";
   return "Ready";
 }
@@ -38,6 +38,7 @@ function statusLabel(status: string) {
 function ExportMenu() {
   const details = useRef<HTMLDetailsElement>(null);
   const exportStl = useStudio((state) => state.exportStl);
+  const exportParts = useStudio((state) => state.exportParts);
   const exportScad = useStudio((state) => state.exportScad);
   const shareLink = useStudio((state) => state.shareLink);
   const notify = useToast((state) => state.notify);
@@ -71,6 +72,16 @@ function ExportMenu() {
         >
           <span>STL mesh</span>
           <span className="mono">.stl</span>
+        </button>
+        <button
+          className="menu-item"
+          onClick={async () => {
+            await exportParts();
+            close();
+          }}
+        >
+          <span>Separate part STLs</span>
+          <span className="mono">.stl ×N</span>
         </button>
         <button
           className="menu-item"
@@ -121,10 +132,14 @@ export function StudioApp() {
   const shareLink = useStudio((state) => state.shareLink);
   const exportStl = useStudio((state) => state.exportStl);
   const generate = useStudio((state) => state.generate);
-  const refineModel = useStudio((state) => state.refineModel);
   const loadExample = useStudio((state) => state.loadExample);
   const referenceImage = useStudio((state) => state.referenceImage);
   const printProfile = useStudio((state) => state.printProfile);
+  const inspection = useStudio((state) => state.inspection);
+  const pendingQuestion = useStudio((state) => state.pendingQuestion);
+  const agentActivity = useStudio((state) => state.agentActivity);
+  const answerQuestion = useStudio((state) => state.answerQuestion);
+  const stopAgent = useStudio((state) => state.stopAgent);
   const setReferenceImage = useStudio((state) => state.setReferenceImage);
   const setPrintProfile = useStudio((state) => state.setPrintProfile);
 
@@ -162,8 +177,8 @@ export function StudioApp() {
       const image = await fileToStudioImage(file);
       setReferenceImage(image);
       setPrintProfile(null);
-      setShowSetup(true);
-      useToast.getState().notify("Reference image attached · set up the print profile");
+      setShowSetup(false);
+      useToast.getState().notify("Reference image attached — describe the object. Print setup is optional unless you ask for 3D printing.");
     } catch (error) {
       useToast.getState().notify(error instanceof Error ? error.message : "Could not read that image", "accent");
     }
@@ -177,20 +192,13 @@ export function StudioApp() {
 
   const sendChat = () => {
     const text = chatText.trim();
-    if (!text || busy) return;
-    if (referenceImage && !printProfile) {
-      setShowSetup(true);
-      useToast.getState().notify("Choose what the image is for first — the agent needs scale and process.", "accent");
-      return;
-    }
-    if (referenceImage && printProfile?.purpose === "3d-print" && !printProfile.bed) {
-      setShowSetup(true);
-      useToast.getState().notify("Add the printer bed size before generating for print.", "accent");
-      return;
-    }
+    if (!text) return;
     setChatText("");
-    if (code) refineModel(text);
-    else generate(text);
+    if (pendingQuestion) {
+      answerQuestion(text);
+      return;
+    }
+    generate(text);
   };
 
   useEffect(() => {
@@ -200,8 +208,7 @@ export function StudioApp() {
 
   const busy = status === "drafting" || status === "repairing" || status === "compiling" || status === "reviewing";
   const working = status === "drafting" || status === "repairing" || status === "reviewing";
-  const profileReady = !referenceImage || Boolean(printProfile);
-  const canSend = chatText.trim().length > 1 && !busy && profileReady;
+  const canSend = chatText.trim().length > 1;
   const bounds = mesh?.bounds;
   const dims = bounds
     ? [
@@ -210,6 +217,7 @@ export function StudioApp() {
         Math.round(bounds.max[2] - bounds.min[2]),
       ]
     : null;
+  const kernelError = status === "error" && !code && /worker|kernel|WebAssembly|OpenSCAD could not start|Failed to fetch|module|wasm/i.test(error ?? "");
   const bed = printProfile?.purpose === "3d-print" ? printProfile.bed : undefined;
   const bedOverflow = bed && dims
     ? (["x", "y", "z"] as const).filter((axis, index) => dims[index] > bed[axis])
@@ -227,7 +235,7 @@ export function StudioApp() {
   return (
     <div className="studio-shell">
       <header className="studio-header">
-        <a className="studio-brand" href="/" aria-label="Cadgo part studio">
+        <a className="studio-brand" href="/" aria-label="Cadgo studio">
           <BrandMark />
           <span className="brand-word">
             cad<span>go</span>
@@ -246,14 +254,14 @@ export function StudioApp() {
             aria-label="Open this part in a new page"
             onClick={() => {
               const link = shareLink();
-              window.open(link ?? `${window.location.origin}/`, "_blank", "noopener,noreferrer");
+              window.open(link ?? `${window.location.origin}/studio`, "_blank", "noopener,noreferrer");
             }}
           >
             <Icon name="arrow" />
           </button>
           <button
-            className="btn"
-            onClick={() => window.open(`${window.location.origin}/`, "_blank", "noopener,noreferrer")}
+            className="btn studio-new-page"
+            onClick={() => window.open(`${window.location.origin}/studio`, "_blank", "noopener,noreferrer")}
             title="Open a blank studio in a new page"
           >
             <Icon name="plus" /> <span>New page</span>
@@ -322,7 +330,7 @@ export function StudioApp() {
 
             <div className="studio-impact-line">
               {code
-                ? "Chat edits this part in place. Every change stays local and reports the changed lines."
+                ? "Chat edits this part in place. The current source stays in context and every change stays local."
                 : "Plain language in, parametric solid out. Dimensions stay live; source stays optional."}
             </div>
 
@@ -366,20 +374,56 @@ export function StudioApp() {
                   <span className="status-dot busy" />
                   <p>
                     {status === "drafting"
-                      ? code
-                        ? "Thinking through the edit. Declared parts stay separate…"
-                        : referenceImage
-                          ? `Reading the image, planning, researching${printProfile?.printer ? ` ${printProfile.printer}` : " references"}, then building…`
-                          : "Planning the parts, checking references, then building…"
+                      ? "Agent is thinking — you can ask, interrupt, or stop."
                       : status === "repairing"
-                        ? "Checking the bodies and clearing the repair…"
+                        ? "Checking the current model…"
                         : status === "reviewing"
-                          ? "Comparing the render to the reference image…"
+                          ? "Inspecting the rendered evidence…"
                           : "Compiling locally…"}
                   </p>
                 </div>
               ) : null}
             </div>
+
+            {agentActivity.length ? (
+              <div className="studio-agent-activity">
+                <span className="eyebrow">Agent activity</span>
+                {agentActivity.slice(-4).map((line, index) => (
+                  <span className="studio-activity-line" key={`${line}-${index}`}>{line}</span>
+                ))}
+              </div>
+            ) : null}
+
+            {pendingQuestion ? (
+              <div className="studio-question">
+                <span className="eyebrow">{pendingQuestion.header ?? "Agent question"}</span>
+                <p>{pendingQuestion.question}</p>
+                {pendingQuestion.options.length ? (
+                  <div className="studio-question-options">
+                    {pendingQuestion.options.map((option) => (
+                      <button key={option.label} className="btn" onClick={() => answerQuestion(option.label)}>
+                        {option.label}
+                        {option.description ? <em>{option.description}</em> : null}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {pendingQuestion.allowCustom ? <span className="mono studio-hint">Or type an answer below.</span> : null}
+              </div>
+            ) : null}
+
+            {inspection ? (
+              <div className="studio-inspection-card">
+                <div className="studio-inspection-head">
+                  <span className="eyebrow">Inspection · iteration {inspection.iteration}</span>
+                  <a href={inspection.dataUrl} download={`cadgo-inspection-${inspection.iteration}.jpg`}>Open sheet</a>
+                </div>
+                <a href={inspection.dataUrl} target="_blank" rel="noreferrer">
+                  <img src={inspection.dataUrl} alt="Inspection sheet of the current model" />
+                </a>
+                <span className="mono">{inspection.views.join(" · ").toUpperCase()}</span>
+              </div>
+            ) : null}
 
             {showSetup ? (
               <PrintSetup
@@ -421,11 +465,13 @@ export function StudioApp() {
                   }
                 }}
                 placeholder={
-                  code
-                    ? "Ask for a change — make the flange 6 mm thicker, add a cable slot…"
-                    : referenceImage
-                      ? "What should I keep or change from the image? Add a known dimension if you have one…"
-                      : "Describe a part — a 100 × 60 × 8 mm mounting plate with four 5 mm holes…"
+                  pendingQuestion
+                    ? "Answer the agent, or ask a follow-up…"
+                    : code
+                      ? "Ask for a change, or ask a question — no build is forced…"
+                      : referenceImage
+                        ? "Describe what you want from the image, or ask a question…"
+                        : "Describe a part or ask a question — the agent decides whether to build…"
                 }
               />
               <div className="studio-compose-actions">
@@ -461,9 +507,12 @@ export function StudioApp() {
                   />
                 </div>
                 <div className="studio-compose-send">
-                  <span className="mono studio-hint">⌘↵ · {code ? "edits this part" : "creates a part"}</span>
+                  <span className="mono studio-hint">⌘↵ · {pendingQuestion ? "answer" : code ? "edits this part" : "starts a conversation"}</span>
+                  {busy || pendingQuestion ? (
+                    <button className="studio-stop" onClick={stopAgent}>Stop</button>
+                  ) : null}
                   <button className="draft-btn" onClick={sendChat} disabled={!canSend}>
-                    {busy ? "Working…" : code ? "Send" : "Generate"} <Icon name="arrow" />
+                    {pendingQuestion ? "Answer" : "Send"} <Icon name="arrow" />
                   </button>
                 </div>
               </div>
@@ -478,15 +527,17 @@ export function StudioApp() {
           ) : null}
 
           <div className="studio-stage-top">
-            <div className="studio-fig">
-              <span className="mono studio-fig-label">FIG. 01 / PART</span>
-              <strong>{mesh ? title : "New part"}</strong>
-              <span className="mono studio-fig-sub">
-                {mesh
-                  ? `Parametric solid · ${mesh.components} ${mesh.components === 1 ? "body" : "bodies"} · millimetres`
-                  : "No model yet · describe it or open a bench study"}
-              </span>
-            </div>
+            {mesh ? (
+              <div className="studio-fig">
+                <span className="mono studio-fig-label">FIG. 01 / PART</span>
+                <strong>{title}</strong>
+                <span className="mono studio-fig-sub">
+                  {`Parametric solid · ${mesh.components} ${mesh.components === 1 ? "body" : "bodies"} · millimetres`}
+                </span>
+              </div>
+            ) : (
+              <div />
+            )}
             <div className="studio-stage-controls">
               <div className="view-controls">
                 <button className={`icon-btn ${view === "iso" ? "active" : ""}`} onClick={() => setView("iso")} aria-label="Isometric view">
@@ -540,7 +591,7 @@ export function StudioApp() {
           {mesh ? (
             <>
               <div className="studio-stage-hint">
-                <kbd>drag</kbd> orbit <kbd>scroll</kbd> zoom <kbd>⌘↵</kbd> generate
+                <kbd>drag</kbd> orbit <kbd>scroll</kbd> zoom <kbd>⌘↵</kbd> send
               </div>
               <div className="studio-readout">
                 <div>
@@ -592,7 +643,7 @@ export function StudioApp() {
                   </button>
                   <button
                     className="btn"
-                    onClick={() => window.open(`${window.location.origin}/`, "_blank", "noopener,noreferrer")}
+                    onClick={() => window.open(`${window.location.origin}/studio`, "_blank", "noopener,noreferrer")}
                   >
                     <Icon name="plus" /> New page
                   </button>
@@ -601,20 +652,22 @@ export function StudioApp() {
             </div>
           ) : null}
 
-          {!mesh && (status === "drafting" || status === "compiling" || status === "repairing") ? (
+          {!mesh && (status === "booting" || status === "drafting" || status === "compiling" || status === "repairing") ? (
             <div className="studio-veil">
               <div className="studio-loading-card">
-                <span className="eyebrow">{status === "drafting" ? "Design pass" : "Local kernel"}</span>
-                <h2>{status === "drafting" ? "Planning the build" : status === "repairing" ? "Checking the bodies" : "Compiling locally"}</h2>
+                <span className="eyebrow">{status === "drafting" ? "Agent" : "Local kernel"}</span>
+                <h2>{status === "booting" ? "Waking the kernel" : status === "drafting" ? "Thinking" : status === "repairing" ? "Checking the model" : "Compiling locally"}</h2>
                 <p>
-                  {status === "drafting"
-                    ? "Cadgo is splitting the object into real parts, checking references and writing the model. This takes longer on purpose."
-                    : "The local kernel is compiling the solid. Nothing is uploaded."}
+                  {status === "booting"
+                    ? "Loading the local OpenSCAD WebAssembly kernel. This happens once per page."
+                    : status === "drafting"
+                      ? "Cadgo is considering your latest message. It may answer, ask a question, or build. You can keep chatting or stop at any time."
+                      : "The local kernel is compiling the solid. Prompts and images go to the AI provider; geometry stays in the browser."}
                 </p>
                 <div className="studio-progress">
                   <span />
                 </div>
-                <span className="mono studio-hint">No server geometry · no upload</span>
+                <span className="mono studio-hint">Local geometry · AI inputs sent</span>
               </div>
             </div>
           ) : null}
@@ -623,15 +676,9 @@ export function StudioApp() {
             <div className="studio-busy-strip">
               <span className="status-dot busy" />
               <span className="mono">
-                {status === "reviewing"
-                  ? "Comparing render to reference"
-                  : status === "repairing"
-                    ? "Checking part separation"
-                    : "Thinking / researching"}
+                {status === "reviewing" ? "Inspecting evidence" : status === "repairing" ? "Checking the model" : "Thinking"}
               </span>
-              <span className="mono studio-hint">
-                {status === "reviewing" ? "visual quality gate" : "quality pass · no fast fallback"}
-              </span>
+              <span className="mono studio-hint">you can ask or stop</span>
             </div>
           ) : null}
 
@@ -668,23 +715,45 @@ export function StudioApp() {
             <div className="studio-error">
               <Icon name="warning" />
               <div>
-                <strong>Bench note.</strong> {error.length > 220 ? `${error.slice(0, 220)}…` : error}
+                <strong>Agent note.</strong> {error.length > 220 ? `${error.slice(0, 220)}…` : error}
               </div>
+              <button
+                className="chip"
+                onClick={() => {
+                  useStudio.setState({ error: null });
+                  composerRef.current?.focus();
+                }}
+              >
+                Keep going
+              </button>
             </div>
           ) : null}
 
           {!mesh && status === "error" ? (
             <div className="studio-veil">
               <div className="studio-loading-card">
-                <span className="eyebrow">Kernel</span>
-                <h2>The bench did not wake.</h2>
-                <p>{error ?? "OpenSCAD could not start in this browser."}</p>
+                <span className="eyebrow">{kernelError ? "Kernel" : "Source"}</span>
+                <h2>{kernelError ? "The local kernel did not start." : "This source did not compile."}</h2>
+                <p>{error ?? "The run did not produce a model."}</p>
                 <div className="chip-row">
-                  {SCAD_EXAMPLES.map((example) => (
-                    <button key={example.id} className="chip" onClick={() => loadExample(example.id)}>
-                      {example.title}
-                    </button>
-                  ))}
+                  {kernelError ? (
+                    SCAD_EXAMPLES.map((example) => (
+                      <button key={example.id} className="chip" onClick={() => loadExample(example.id)}>
+                        {example.title}
+                      </button>
+                    ))
+                  ) : (
+                    <>
+                      <button className="chip" onClick={() => { newPart(); composerRef.current?.focus(); }}>
+                        Start fresh
+                      </button>
+                      {SCAD_EXAMPLES.slice(0, 2).map((example) => (
+                        <button key={example.id} className="chip" onClick={() => loadExample(example.id)}>
+                          {example.title}
+                        </button>
+                      ))}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -714,6 +783,38 @@ export function StudioApp() {
             <div className="studio-panel-body">
               {inspector === "dimensions" ? (
                 <>
+                  <div className="studio-print-check">
+                    <div className="studio-parts-head">
+                      <span className="panel-label">Print check</span>
+                      <span className={`mono ${mesh && (mesh.boundaryEdges > 0 || mesh.nonManifoldEdges > 0) ? "warn" : ""}`}>
+                        {mesh
+                          ? mesh.boundaryEdges > 0 || mesh.nonManifoldEdges > 0
+                            ? "Not watertight"
+                            : "Watertight"
+                          : "—"}
+                      </span>
+                    </div>
+                    <div className="studio-print-rows">
+                      <span>Open edges</span><span className="mono">{mesh ? mesh.boundaryEdges : "—"}</span>
+                      <span>Non-manifold</span><span className="mono">{mesh ? mesh.nonManifoldEdges : "—"}</span>
+                      <span>Overhang</span>
+                      <span className={`mono ${mesh && printProfile?.supports === "none" && mesh.overhangPercent > 5 ? "warn" : ""}`}>
+                        {mesh ? `${mesh.overhangPercent.toFixed(1)}% · ${mesh.overhangArea.toFixed(0)} mm²` : "—"}
+                      </span>
+                      <span>Bed fit</span>
+                      <span className="mono">
+                        {!mesh
+                          ? "—"
+                          : !bed
+                            ? "No print profile"
+                            : bedOverflow.length
+                              ? `Exceeds ${bedOverflow.map((axis) => axis.toUpperCase()).join("/")}`
+                              : `Fits ${bed.x}×${bed.y}×${bed.z}`}
+                      </span>
+                      <span>Volume</span><span className="mono">{mesh ? `${(mesh.volume / 1000).toFixed(1)} cm³` : "—"}</span>
+                    </div>
+                  </div>
+
                   <div className="studio-parts">
                     <div className="studio-parts-head">
                       <span className="panel-label">Part manifest</span>

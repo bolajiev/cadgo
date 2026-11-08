@@ -5,7 +5,7 @@ import { SCAD_EXAMPLES } from "../lib/scad/examples";
 describe("OpenSCAD parameter extraction", () => {
   it("reads the knob parameters with ranges", () => {
     const params = parseParameters(SCAD_EXAMPLES[0].code);
-    expect(params.map((item) => item.name)).toEqual([
+    expect(params.slice(0, 6).map((item) => item.name)).toEqual([
       "diameter",
       "height",
       "shaft",

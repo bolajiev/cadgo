@@ -1,0 +1,17 @@
+.env
+.env.*
+.agents/
+.vercel.old/
+.data/
+docs/
+tests/
+services/
+workers/
+scripts/
+vercel-app/
+vercel-probe/
+test-results/
+playwright-report/
+blob-report/
+*.jpg
+skills-lock.json

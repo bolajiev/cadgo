@@ -21,12 +21,20 @@ export function auditParameterization(code: string): ParameterAudit {
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/\/\/.*$/gm, " ");
   const first = cleaned.search(/^\s*(module|function)\s/m);
-  const body = first >= 0 ? cleaned.slice(first) : "";
-  const scoped = body
+  const prefix = first >= 0 ? cleaned.slice(0, first) : cleaned;
+  const rest = first >= 0 ? cleaned.slice(first) : "";
+  const prefixCode = prefix
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*[A-Za-z_$][\w$]*\s*=\s*[^;]+;\s*$/.test(line))
+    .join("\n");
+  const scoped = `${prefixCode}\n${rest}`
     .replace(/color\s*\(\s*\[[^\]]*\]\s*\)/gi, "color()")
     .replace(/\$fn\s*=\s*[^;]+;/g, " ");
   const issues: ParameterAuditIssue[] = [];
   const seen = new Set<string>();
+  if (/^\s*(include|use)\s*</m.test(cleaned)) {
+    issues.push({ value: "external include", context: "External includes are not allowed." });
+  }
   const lines = scoped.split(/\r?\n/);
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index].trim();

@@ -134,7 +134,7 @@ function ModelMesh({
       </mesh>
       {edges ? (
         <lineSegments geometry={edges}>
-          <lineBasicMaterial color="#26241f" transparent opacity={0.3} depthWrite={false} />
+          <lineBasicMaterial color="#ddd5df" transparent opacity={0.24} depthWrite={false} />
         </lineSegments>
       ) : null}
     </group>
@@ -173,10 +173,10 @@ function GridFloor({ visible, radius }: { visible: boolean; radius: number }) {
   return (
     <group>
       <lineSegments geometry={geometry.minor}>
-        <lineBasicMaterial color="#b8b0a0" transparent opacity={0.2} depthWrite={false} />
+        <lineBasicMaterial color="#4b4553" transparent opacity={0.32} depthWrite={false} />
       </lineSegments>
       <lineSegments geometry={geometry.major}>
-        <lineBasicMaterial color="#a49b8b" transparent opacity={0.34} depthWrite={false} />
+        <lineBasicMaterial color="#6f6578" transparent opacity={0.4} depthWrite={false} />
       </lineSegments>
     </group>
   );
@@ -232,8 +232,8 @@ function Scene({ mesh, view, fitKey, showEdges, showGrid }: Props) {
   return (
     <>
       <ZUpCamera />
-      <color attach="background" args={["#ede9de"]} />
-      <ambientLight intensity={0.5} />
+      <color attach="background" args={["#08090c"]} />
+      <ambientLight intensity={0.85} />
       <directionalLight
         position={[radius * 2.2, -radius * 2.6, radius * 3.2]}
         intensity={2.45}
@@ -268,7 +268,7 @@ function Scene({ mesh, view, fitKey, showEdges, showGrid }: Props) {
       <SoftShadow radius={radius} />
       <mesh position={[0, 0, 0.02]} receiveShadow>
         <planeGeometry args={[radius * 30, radius * 30]} />
-        <shadowMaterial transparent opacity={0.15} />
+        <shadowMaterial transparent opacity={0.45} />
       </mesh>
       {mesh ? <ModelMesh mesh={mesh} center={center} showEdges={showEdges} /> : null}
       <StudioCamera center={cameraCenter} radius={radius} view={view} fitKey={fitKey} />

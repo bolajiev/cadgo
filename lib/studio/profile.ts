@@ -20,4 +20,5 @@ export type PrintProfile = {
   material?: string;
   supports?: "none" | "allowed";
   scaleNote?: string;
+  scaleEstimated?: boolean;
 };

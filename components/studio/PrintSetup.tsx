@@ -26,12 +26,14 @@ export function PrintSetup({
 }) {
   const [purpose, setPurpose] = useState<BuildPurpose>(initial?.purpose ?? "3d-print");
   const [printer, setPrinter] = useState(initial?.printer ?? "");
-  const [bed, setBed] = useState<PrintBed>(initial?.bed ?? { x: 220, y: 220, z: 250 });
+  const [bed, setBed] = useState<PrintBed>(initial?.bed ?? { x: 0, y: 0, z: 0 });
   const [material, setMaterial] = useState(initial?.material ?? "PLA");
   const [supports, setSupports] = useState<"none" | "allowed">(initial?.supports ?? "none");
   const [scaleNote, setScaleNote] = useState(initial?.scaleNote ?? "");
+  const [scaleEstimated, setScaleEstimated] = useState(initial?.scaleEstimated ?? false);
   const validBed = bed.x > 0 && bed.y > 0 && bed.z > 0;
-  const canSave = purpose !== "3d-print" || validBed;
+  const validScale = !hasImage || Boolean(scaleNote.trim()) || scaleEstimated;
+  const canSave = purpose !== "3d-print" || (validBed && validScale);
 
   const save = () => {
     if (!canSave) return;
@@ -43,6 +45,7 @@ export function PrintSetup({
       profile.supports = supports;
     }
     if (scaleNote.trim()) profile.scaleNote = scaleNote.trim();
+    if (scaleEstimated) profile.scaleEstimated = true;
     onSave(profile);
   };
 
@@ -74,13 +77,23 @@ export function PrintSetup({
         <>
           <div className="studio-setup-fields">
             <label className="studio-setup-wide">
-              <span>Known scale <em>optional, e.g. overall width 80 mm</em></span>
+              <span>Known scale <em>{hasImage ? "required unless estimated" : "optional"}</em></span>
               <input
                 value={scaleNote}
                 onChange={(event) => setScaleNote(event.target.value)}
                 placeholder="A ruler in the photo, or a measured dimension"
               />
             </label>
+            {hasImage ? (
+              <label className="studio-scale-estimate studio-setup-wide">
+                <input
+                  type="checkbox"
+                  checked={scaleEstimated}
+                  onChange={(event) => setScaleEstimated(event.target.checked)}
+                />
+                <span>Scale is estimated from proportions — do not use this for a critical fit</span>
+              </label>
+            ) : null}
             <label className="studio-setup-wide">
               <span>Printer model <em>optional</em></span>
               <input
@@ -138,9 +151,13 @@ export function PrintSetup({
           </div>
           <p className="studio-setup-hint">
             <Icon name="info" size={11} />
-            {printer.trim()
-              ? `I will research ${printer.trim()} and the bed before drawing.`
-              : "I will research this build volume and FDM print constraints before drawing."}
+            {!validBed
+              ? "Enter the bed size — there is no hidden default."
+              : !validScale
+                ? "Enter one known dimension or confirm that scale is estimated."
+                : printer.trim()
+                  ? `The agent will treat ${printer.trim()} and this bed as constraints.`
+                  : "The agent will treat this bed and build volume as constraints."}
           </p>
         </>
       ) : (

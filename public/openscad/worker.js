@@ -101,6 +101,9 @@ function parseOff(text) {
     if (z > box.max[2]) box.max[2] = z;
   }
   const boxes = [...components.values()];
+  const componentIndexByRoot = new Map();
+  [...components.keys()].forEach((root, index) => componentIndexByRoot.set(root, index));
+  const componentIds = [];
   const touches = (a, b) => {
     const gaps = [0, 1, 2].map((axis) =>
       Math.max(0, b.min[axis] - a.max[axis], a.min[axis] - b.max[axis]),
@@ -127,16 +130,60 @@ function parseOff(text) {
     }
     for (let triangle = 0; triangle < n - 2; triangle++) {
       const ids = [parts[1], parts[2 + triangle], parts[3 + triangle]];
+      const root = find(ids[0]);
       for (const id of ids) {
         if (!Number.isFinite(id) || id < 0 || id >= vertexCount) continue;
         positions.push(vertices[id * 3], vertices[id * 3 + 1], vertices[id * 3 + 2]);
         colors.push(color[0], color[1], color[2]);
       }
+      componentIds.push(componentIndexByRoot.get(root) ?? 0);
     }
   }
   if (!positions.length) throw new Error("The model has no solid faces");
   const positionsArray = new Float32Array(positions);
   const colorsArray = new Float32Array(colors);
+  const weld = new Map();
+  const edges = new Map();
+  let volume = 0;
+  for (let triangle = 0; triangle < positionsArray.length / 9; triangle++) {
+    const ids = [];
+    for (let vertex = 0; vertex < 3; vertex++) {
+      const offset = triangle * 9 + vertex * 3;
+      const x = positionsArray[offset];
+      const y = positionsArray[offset + 1];
+      const z = positionsArray[offset + 2];
+      const key = `${Math.round(x * 10000)},${Math.round(y * 10000)},${Math.round(z * 10000)}`;
+      let id = weld.get(key);
+      if (id === undefined) {
+        id = weld.size;
+        weld.set(key, id);
+      }
+      ids.push(id);
+    }
+    for (let edge = 0; edge < 3; edge++) {
+      const a = ids[edge];
+      const b = ids[(edge + 1) % 3];
+      if (a === b) continue;
+      const edgeKey = a < b ? `${a}:${b}` : `${b}:${a}`;
+      edges.set(edgeKey, (edges.get(edgeKey) ?? 0) + 1);
+    }
+    const ax = positionsArray[triangle * 9];
+    const ay = positionsArray[triangle * 9 + 1];
+    const az = positionsArray[triangle * 9 + 2];
+    const bx = positionsArray[triangle * 9 + 3];
+    const by = positionsArray[triangle * 9 + 4];
+    const bz = positionsArray[triangle * 9 + 5];
+    const cx = positionsArray[triangle * 9 + 6];
+    const cy = positionsArray[triangle * 9 + 7];
+    const cz = positionsArray[triangle * 9 + 8];
+    volume += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+  }
+  let boundaryEdges = 0;
+  let nonManifoldEdges = 0;
+  for (const count of edges.values()) {
+    if (count === 1) boundaryEdges++;
+    else if (count > 2) nonManifoldEdges++;
+  }
   let minX = Infinity;
   let minY = Infinity;
   let minZ = Infinity;
@@ -154,12 +201,49 @@ function parseOff(text) {
     if (y > maxY) maxY = y;
     if (z > maxZ) maxZ = z;
   }
+  let surfaceArea = 0;
+  let overhangArea = 0;
+  for (let triangle = 0; triangle < positionsArray.length / 9; triangle++) {
+    const o = triangle * 9;
+    const ax = positionsArray[o];
+    const ay = positionsArray[o + 1];
+    const az = positionsArray[o + 2];
+    const bx = positionsArray[o + 3];
+    const by = positionsArray[o + 4];
+    const bz = positionsArray[o + 5];
+    const cx = positionsArray[o + 6];
+    const cy = positionsArray[o + 7];
+    const cz = positionsArray[o + 8];
+    const ux = bx - ax;
+    const uy = by - ay;
+    const uz = bz - az;
+    const vx = cx - ax;
+    const vy = cy - ay;
+    const vz = cz - az;
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    const length = Math.hypot(nx, ny, nz);
+    if (!length) continue;
+    const area = length / 2;
+    surfaceArea += area;
+    const bedContact = az <= minZ + 0.05 && bz <= minZ + 0.05 && cz <= minZ + 0.05;
+    if (!bedContact && nz / length < -Math.SQRT1_2) overhangArea += area;
+  }
+  const overhangPercent = surfaceArea > 0 ? (overhangArea / surfaceArea) * 100 : 0;
   return {
     positions: positionsArray,
     colors: colorsArray,
     triangles: positionsArray.length / 9,
     components: boxes.length,
     floating,
+    boundaryEdges,
+    nonManifoldEdges,
+    volume: Math.abs(volume),
+    surfaceArea,
+    overhangArea,
+    overhangPercent,
+    componentIds: new Uint32Array(componentIds),
     bounds: { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] },
   };
 }
@@ -254,6 +338,7 @@ scope.onmessage = async (event) => {
   if (!message || typeof message.id === "undefined") return;
   try {
     if (message.type === "warm") {
+      await compile("cube([1, 1, 1]);", {});
       send({ id: message.id, type: "warm", ok: true });
       return;
     }
@@ -270,10 +355,17 @@ scope.onmessage = async (event) => {
           bounds: result.mesh.bounds,
           components: result.mesh.components,
           floating: result.mesh.floating,
+          boundaryEdges: result.mesh.boundaryEdges,
+          nonManifoldEdges: result.mesh.nonManifoldEdges,
+          volume: result.mesh.volume,
+          surfaceArea: result.mesh.surfaceArea,
+          overhangArea: result.mesh.overhangArea,
+          overhangPercent: result.mesh.overhangPercent,
+          componentIds: result.mesh.componentIds,
           stderr: result.stderr,
           duration: result.duration,
         },
-        [result.mesh.positions.buffer, result.mesh.colors.buffer],
+        [result.mesh.positions.buffer, result.mesh.colors.buffer, result.mesh.componentIds.buffer],
       );
       return;
     }

@@ -1,0 +1,122 @@
+import { readFileSync } from "node:fs";
+import { expect, test } from "@playwright/test";
+import { unzipSync } from "fflate";
+
+test("assembly studio loads the V8 and keeps editing live", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/studio");
+  await expect(page.locator(".v2-tree")).toBeVisible({ timeout: 60_000 });
+
+  await page.locator("summary").filter({ hasText: "Benchbook" }).click();
+  await page.locator(".v2-labs summary").click();
+  await page.getByText("V8 concept", { exact: true }).click();
+  await expect(page.locator(".v2-stage-label")).toContainText("V8 concept");
+
+  await expect
+    .poll(
+      async () => {
+        const statuses = await page.locator(".v2-status").allTextContents();
+        return statuses.length >= 14 && statuses.every((status) => status === "ready");
+      },
+      { timeout: 120_000 },
+    )
+    .toBe(true);
+
+  const close = page.locator(".v2-notice button");
+  if (await close.count()) await close.click();
+  await page.locator(".view-controls button").filter({ hasText: "SD" }).click();
+  await page.waitForTimeout(900);
+  await expect(page.locator(".v2-stage")).toHaveScreenshot("v8-stage.png", {
+    animations: "disabled",
+    maxDiffPixelRatio: 0.04,
+  });
+
+  await page.locator(".v2-instance-row .v2-row-name").filter({ hasText: "Block" }).first().click();
+  const px = page.locator(".v2-inspector .v2-field input").first();
+  await expect(px).toHaveValue("0");
+  await px.fill("15");
+  await px.blur();
+  await expect(px).toHaveValue("15");
+  await page.locator('[aria-label="Undo"]').click();
+  await expect(px).toHaveValue("0");
+
+  await expect(page.locator(".v2-motion-hud")).toBeVisible();
+  await page.locator('.v2-motion-hud button[aria-label="Play motion"]').click();
+  await expect(page.locator(".v2-motion-value")).not.toHaveText("0deg", { timeout: 10_000 });
+  await page.locator('.v2-motion-hud button[aria-label="Pause motion"]').click();
+
+  await page.locator(".v2-inspector button").filter({ hasText: "Isolate" }).click();
+  await expect(page.locator(".v2-isolate-banner")).toBeVisible();
+  await page.locator(".v2-isolate-banner button").click();
+  await expect(page.locator(".v2-isolate-banner")).toHaveCount(0);
+
+  await page.locator(".v2-group-row .v2-row-name").filter({ hasText: "Heads" }).first().click();
+  await expect(page.locator(".v2-inspector")).toContainText("Assembly group");
+  const groupPx = page.locator(".v2-inspector .v2-field input").first();
+  await groupPx.fill("15");
+  await groupPx.blur();
+  await expect(groupPx).toHaveValue("15");
+  await page.locator('[aria-label="Undo"]').click();
+  await expect(groupPx).toHaveValue("0");
+
+  expect(pageErrors).toEqual([]);
+});
+
+test("scene export produces a valid GLB and a per-part STL archive", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/studio");
+  await expect(page.locator(".v2-tree")).toBeVisible({ timeout: 60_000 });
+  await page.locator("summary").filter({ hasText: "Benchbook" }).click();
+  await page.locator(".v2-labs summary").click();
+  await page.locator(".v2-labs button").filter({ hasText: "Wind turbine" }).click();
+
+  await expect
+    .poll(
+      async () => {
+        const statuses = await page.locator(".v2-status").allTextContents();
+        return statuses.length === 3 && statuses.every((status) => status === "ready");
+      },
+      { timeout: 120_000 },
+    )
+    .toBe(true);
+
+  await page.locator(".v2-export summary").click();
+  const [glbDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator(".v2-export .menu-item").filter({ hasText: "Scene GLB" }).click(),
+  ]);
+  expect(glbDownload.suggestedFilename()).toBe("wind-turbine.glb");
+  const glbPath = await glbDownload.path();
+  expect(glbPath).toBeTruthy();
+  const glb = readFileSync(glbPath as string);
+  expect(glb.subarray(0, 4).toString("utf8")).toBe("glTF");
+  expect(glb.readUInt32LE(4)).toBe(2);
+  expect(glb.byteLength).toBe(glb.readUInt32LE(8));
+
+  await page.locator(".v2-export summary").click();
+  const [partsDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator(".v2-export .menu-item").filter({ hasText: "Part STLs" }).click(),
+  ]);
+  expect(partsDownload.suggestedFilename()).toBe("wind-turbine-parts.zip");
+  const partsPath = await partsDownload.path();
+  expect(partsPath).toBeTruthy();
+  const archive = unzipSync(new Uint8Array(readFileSync(partsPath as string)));
+  expect(Object.keys(archive)).toEqual(
+    expect.arrayContaining([
+      "assembly.stl",
+      "manifest.json",
+      "README.txt",
+      "parts/01-tower.stl",
+      "parts/02-nacelle.stl",
+      "parts/03-rotor.stl",
+    ]),
+  );
+  expect(archive["assembly.stl"].byteLength).toBeGreaterThan(84);
+
+  expect(pageErrors).toEqual([]);
+});

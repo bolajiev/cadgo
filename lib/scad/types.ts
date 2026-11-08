@@ -9,6 +9,13 @@ export type ScadMesh = {
   triangles: number;
   components: number;
   floating: number;
+  boundaryEdges: number;
+  nonManifoldEdges: number;
+  volume: number;
+  surfaceArea: number;
+  overhangArea: number;
+  overhangPercent: number;
+  componentIds: Uint32Array;
   bounds: ScadBounds;
 };
 

@@ -8,8 +8,35 @@ coverage
 .env.*.local
 *.log
 .DS_Store
-.vercel
+.vercel/
 shots
+
+# Local recording and scratch artifacts
+.tmp-*
+/recordings/
 
 *.tsbuildinfo
 .env*
+!.env.example
+
+# Experimental Python B-Rep service; not part of the local OpenSCAD product
+__pycache__/
+*.pyc
+/services/cad-engine/
+/lib/ai/brep.ts
+
+# Local agent tooling and internal notes
+/.agents/
+/docs/superpowers/
+/skills-lock.json
+
+# One-off source image not used by the app
+/HU9zVABXkAAJKTx.jpg
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+
+# Local large-share storage
+/.data/

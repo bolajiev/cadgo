@@ -1,0 +1,51 @@
+1
+00:00:00,000 --> 00:00:01,600
+Most AI CAD tools stop at a picture.
+
+2
+00:00:01,600 --> 00:00:03,000
+Cadgo gives you a working assembly.
+
+3
+00:00:03,000 --> 00:00:08,000
+Fifteen parts, twelve joints, one walk-phase driver.
+
+4
+00:00:08,000 --> 00:00:15,000
+Hips, knees, ankles, arms and waist move as separate bodies — not a baked animation.
+
+5
+00:00:15,000 --> 00:00:20,000
+Now the agent edits the same assembly.
+
+6
+00:00:20,000 --> 00:00:29,000
+It reads the document, changes the torso's named parameters, recompiles locally, and inspects its own work.
+
+7
+00:00:29,000 --> 00:00:36,000
+The reasoning streams while it works.
+
+8
+00:00:36,000 --> 00:00:45,000
+The torso is wider, the walk cycle still runs, and every part is still separate.
+
+9
+00:00:45,000 --> 01:00,000
+Local compile. Separate bodies. Standard outputs.
+
+10
+01:00,000 --> 01:12,000
+Resize the workspace, isolate a body, and export separate STLs, a SCAD bundle, or the editable document.
+
+11
+01:12,000 --> 01:16,000
+The geometry never leaves your browser.
+
+12
+01:16,000 --> 01:19,000
+Cadgo is concept CAD, not an engineering B-Rep kernel.
+
+13
+01:19,000 --> 01:21,333
+Describe it. Inspect it. Move it. Export it.

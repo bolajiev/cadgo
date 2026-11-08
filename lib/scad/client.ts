@@ -18,6 +18,13 @@ type WorkerMessage = {
   bounds?: ScadMesh["bounds"];
   components?: number;
   floating?: number;
+  boundaryEdges?: number;
+  nonManifoldEdges?: number;
+  volume?: number;
+  surfaceArea?: number;
+  overhangArea?: number;
+  overhangPercent?: number;
+  componentIds?: Uint32Array;
   stderr?: string;
   duration?: number;
   stl?: Uint8Array;
@@ -55,6 +62,13 @@ class ScadClient {
           },
           components: message.components ?? 1,
           floating: message.floating ?? 0,
+          boundaryEdges: message.boundaryEdges ?? 0,
+          nonManifoldEdges: message.nonManifoldEdges ?? 0,
+          volume: message.volume ?? 0,
+          surfaceArea: message.surfaceArea ?? 0,
+          overhangArea: message.overhangArea ?? 0,
+          overhangPercent: message.overhangPercent ?? 0,
+          componentIds: message.componentIds ?? new Uint32Array(0),
           stderr: message.stderr ?? "",
           duration: message.duration ?? 0,
         });
@@ -99,7 +113,17 @@ class ScadClient {
   }
 
   preview(code: string, params: Record<string, ScadParamValue> = {}): Promise<ScadPreview> {
-    return this.send<ScadPreview>({ type: "preview", code, params });
+    const request = this.send<ScadPreview>({ type: "preview", code, params });
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeout = new Promise<ScadPreview>((_, reject) => {
+      timer = setTimeout(() => {
+        this.reset();
+        reject(new Error("The local kernel timed out. The model may be too complex; simplify the geometry."));
+      }, 60000);
+    });
+    return Promise.race([request, timeout]).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
   }
 
   exportStl(code: string, params: Record<string, ScadParamValue> = {}): Promise<Uint8Array> {

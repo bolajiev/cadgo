@@ -1,58 +1,64 @@
-# Cadgo — AI CAD part studio
+# Cadgo — AI 3D assembly studio
 
 **Hackathon:** Victoria VR AI Builder Hackathon 2026  
 **Category:** AI-assisted 3D editing  
-**Tagline:** Describe a part. Get real CAD.
+**Tagline:** Describe a part or scene. Get editable 3D.
 
 ## Short description
 
-Cadgo is a browser-based AI CAD workbench that opens on a blank new part. A plain-language brief becomes editable OpenSCAD source, compiled locally with the OpenSCAD WebAssembly kernel. Parameters rebuild in the browser, the actual source is visible and editable, and every model exports as STL or SCAD. A plan-first pass, a body-count check and a compiler-repair loop keep real failures from becoming a broken result.
+Cadgo is a browser-based AI 3D assembly studio for mechanical assemblies and concept 3D scenes. A plain-language brief becomes a parametric assembly graph of reusable OpenSCAD definitions, placed instances, groups, joints and drivers. Every part compiles locally in the browser. You can select a part, edit its dimensions, source or placement, hide or lock it, and keep working while the agent builds another part; material overrides are set through the agent or the source. The output is editable source, named dimensions, separate bodies and standard exports — not a frozen mesh. CAD-grade parametric editing stays the core.
 
 ## Impact
 
-CAD remains expert software, while most AI 3D tools stop at a mesh. Cadgo gives hardware teams, makers and educators a parametric starting point with editable source, real dimensions and STL/SCAD exports — a first draft that can enter a real workflow rather than a pretty dead end. The blank new-part state is deliberate: no forced demo model, no fake preview.
+CAD is still expert software, and most AI 3D tools stop at a mesh. Cadgo gives hardware teams, makers, educators and concept-scene creators a usable starting point: a real parametric model they can dimension, edit, inspect, drive through joints and export. The assembly tree and per-part revisions make a multi-part model editable layer by layer instead of forcing a full regeneration.
 
 ## What was built
 
-- Image or prompt → agent setup (purpose, printer, bed) → research → parametric OpenSCAD → local WASM mesh → interactive 3D.
-- A render-versus-reference visual check, with invalid corrections rejected by the body-count gate.
-- Chat feedback edits the current source in place; the reply reports changed lines instead of starting over.
-- Top-level Customizer parameters exposed as live "Dimensions" sliders; slider edits rewrite the source and recompile locally.
-- Optional "Dimensions" and "Source" inspector panels; the default stage stays open and uncluttered.
-- A planner decomposes the object into real, separately manufacturable parts and lists the standards and printer to verify; the server researches those references and shows the sources.
-- For 3D printing, the agent asks for the printer and bed size, researches the build volume and FDM constraints, and checks the compiled envelope against the bed.
-- Compiler-error repair and a body-count check: every declared part must be its own watertight body, so the result is a real assembly rather than a fused mesh.
-- Four complete benchbook studies: knurled knob, honeycomb bracket, twisted hex vase, spur gear.
-- Direct STL download of the current edited part; SCAD export and compressed share links.
-- Plan → research → CAD → local compile → body-count check, with no fast fallback that can skip the quality gates.
+- Unified assembly graph: groups, definitions, instances, joints, drivers, commands, undo/redo and IndexedDB autosave. The same graph backs mechanical assemblies and concept 3D scenes.
+- DeepSeek V4.1 Flash agent with tools for definitions, groups, instances, drivers and joints. Every mutation carries a base revision; the user wins on conflict and the agent re-reads.
+- Local OpenSCAD WASM compile pool with per-variant hash caching, progressive loading, last-good meshes, per-part metrics and compiler logs.
+- CAD workspace: orthographic stage, standard views, axis gizmo, overall dimension lines, assembly tree, 3D selection, translate/rotate gizmo, isolate, group transforms and a per-part inspector.
+- Per-instance parameter overrides compiled as separate variants.
+- Image reference (up to three views) and optional print setup (purpose, printer, bed, material, supports); the print profile gates STL export on bed overflow.
+- Expression-driven motion as working logic for mechanisms and scenes: revolute, prismatic and link joints, including group joints so a complete rotor/fan subassembly spins intact; crank-angle and rotor-angle drivers; concept labs for a driven wind turbine, a V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle.
+- Inspection sheets rendered from the assembled scene and returned to the agent as vision evidence.
+- Exports: assembly STL, Scene GLB with the group hierarchy and resolved materials, a Part STLs ZIP with one transformed STL per visible instance plus the merged assembly, a ZIP with one editable SCAD per definition plus the assembly manifest and native document, plus `.cadgo.json`. Import `.scad` or `.cadgo.json`.
+- Compressed share links, with an optional Blob/local service for assemblies above the URL limit.
+- All benchbook studies pass the parametric audit; the unit/integration suite plus Playwright smoke, export and visual snapshot coverage verify the document, compile, motion, GLB, per-part STL and scene paths.
 
 ## Generalizability
 
-The engine is not specific to the four studies. Any OpenSCAD source can be imported; its top-level dimensions are extracted and exposed as sliders, and the compiler-repair loop works on arbitrary generated source. The same local kernel + parameter extractor + repair loop can be reused in a CAD editor, an API, or a classroom tool. STL and SCAD are standard outputs, so adoption does not require a proprietary runtime.
+The engine is not tied to a single study or to CAD alone. Any OpenSCAD source becomes a definition; instances reuse compiled geometry; the command/revision model applies to arbitrary assemblies and scenes. The same unified graph, local kernel, parameter extractor, audit, agent tools and export path can sit behind a CAD API, classroom tool, scene editor or plugin. Scene GLB exports the same assembly graph into the three.js/glTF ecosystem, so the output is usable beyond the studio.
 
 ## How AI is used
 
-The system is a **planning engineer + design compiler**, not a mesh generator. A first model call sees the image/brief plus the print profile and decomposes the object into real parts, dimensions, unknowns and a research list. The server researches those references, including the printer's build volume, through a guarded web lookup and attaches the source links. A second model call writes a complete OpenSCAD program plus a bill of parts. The browser compiles it with OpenSCAD WASM; the compiler log, connected-body count and declared part count feed a repair pass. The browser then renders the model and sends the render plus the reference image to a visual-check pass; a correction that breaks the body check is rejected. The gate is strict: distinct parts must remain separate bodies with clearance, and a declared part cannot disappear into a fused solid. In chat, the model receives the current source and applies the smallest coherent change; the UI reports changed lines and keeps the part manifest visible. The app opens with no preview or starter solid; a model appears only when the user generates one or explicitly opens a bench study. **New page** opens a fresh blank studio in a new tab. The model never executes code on the server. Parameters and direct code edits stay local and deterministic.
+The system is an **agentic 3D assembly editor**. DeepSeek V4.1 Flash decides when to list, read, create, update, place, inspect, ask or answer; there is no fixed phase list. The same tools build mechanical assemblies and concept scenes, with joints and drivers as the working logic. Agent replies stream into the chat and render Markdown, including bold text, lists and fenced OpenSCAD blocks. If a turn hits the output limit, the agent automatically continues in smaller steps rather than stopping for a manual prompt. The client sends a compact model state plus the conversation, not the whole document, and the agent fetches only the definition it is about to change.
+
+`create_definition` / `update_definition` enforce the parametric audit before mutating the document. The browser compiles locally and returns metrics or logs. `render_views` renders the assembly and sends the sheet back as vision evidence. User edits and agent edits are both immutable commands; each agent mutation is checked against the target revision. A conflict is returned for the agent to rebase or ask about. The model never executes geometry on the server.
 
 ## Demo quality
 
-Cadgo opens on a blank new part. The user can type a brief, import a `.scad`, or explicitly load a bench study; New page opens another blank studio in a new tab. The core journey — prompt, model, optional dimensions/source, direct STL download — fits on one screen with the inspector closed by default, and is designed to be recorded in under three minutes ([VIDEO.md](VIDEO.md)).
+- Recorded demo: `docs/cadgo-demo.mp4` (1:21, 1280×720, silent) with captions in `docs/cadgo-demo.srt`. Narration, shot list and prompt cards are in `DEMO_SCRIPT.md`.
+
+The core journey fits on one screen: describe a part or scene, watch the agent build or edit it, adjust dimensions or source in the inspector, orbit or use standard views, drag the gizmo, then export STL, Scene GLB, Part STLs, SCAD and JSON. The agent remains usable while the user edits; questions and conflicts are non-blocking. Concept labs exercise larger assemblies, a driven wind turbine, motion and transparent materials.
 
 ## Technical notes
 
 - Next.js 16, React 19, React Three Fiber / three.js.
-- OpenSCAD 2025 WebAssembly in a module worker: STL/OFF generation, source compile, local parameter rebuilds.
-- Customizer-comment parameter extraction; source-preserving parameter updates.
-- OpenCode Go OpenAI-compatible endpoint: DeepSeek V4.1 Flash planner/writer/vision, no model fallback.
-- Compiler repair, connected-body counting and declared-part body checks.
-- Image reference, printer/bed intake, visual render critique, and SSRF-guarded web research with visible citations.
-- Server-only API key, per-IP rate limits, no account, browser-local share links.
+- OpenSCAD 2025 WebAssembly in a module-worker pool, Manifold backend.
+- Immutable document commands with per-node revisions, undo/redo and autosave.
+- SHA-256 variant cache, LRU memory cap, progressive compile and last-good meshes.
+- Expression-driven joints using a restricted expression parser; no server geometry and no recompile for motion.
+- Definition materials with explicit per-instance overrides; an override never mutates the shared definition.
+- Scene GLB export with the group hierarchy and resolved materials; the GLB is static, and joint/driver motion is not baked into animation clips.
+- Orthographic CAD stage with view gizmo, dimension annotations and transparent materials.
+- Parametric audit extended to top-level geometry calls and external includes.
+- Server-only API key, per-session and per-IP rate limits with an optional durable Redis (Upstash or Vercel KV) store, no account, local documents. Optional large-share storage through Vercel Blob or a local `.data/shares` directory.
 
 ## Links
 
 - Repository: https://github.com/bolajiev/cadgo
-- Live demo: https://cadgo-ashy.vercel.app
-- Video: `<add video URL>`
+- Live studio: https://cadgo-v2.vercel.app/studio
 
 ## Credits
 

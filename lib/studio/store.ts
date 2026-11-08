@@ -4,7 +4,9 @@ import { create } from "zustand";
 import LZString from "lz-string";
 import { scadClient } from "@/lib/scad/client";
 import type { ScadMesh, ScadParamValue } from "@/lib/scad/types";
+import { binaryStl } from "@/lib/scad/stl";
 import { auditParameterization } from "@/lib/scad/audit";
+import { renderInspectionSheet } from "@/lib/studio/inspection";
 import {
   parametersToValues,
   parseParameters,
@@ -26,6 +28,34 @@ export type StudioPart = {
   quantity: number;
 };
 
+export type StudioInspection = {
+  dataUrl: string;
+  iteration: number;
+  title: string;
+  width: number;
+  height: number;
+  views: string[];
+};
+
+export type AgentQuestion = {
+  toolCallId: string;
+  question: string;
+  header?: string;
+  options: { label: string; description?: string }[];
+  allowCustom: boolean;
+};
+
+export type AgentUiMessage = {
+  role: "user" | "assistant" | "tool";
+  content: string | Record<string, unknown>[];
+  tool_calls?: {
+    id?: string;
+    type?: string;
+    function?: { name?: string; arguments?: string | Record<string, unknown> };
+  }[];
+  tool_call_id?: string;
+};
+
 export type StudioMessage = {
   id: string;
   role: "user" | "ai" | "system";
@@ -37,15 +67,6 @@ export type StudioMessage = {
 };
 
 export type StudioStatus = "booting" | "idle" | "drafting" | "compiling" | "repairing" | "reviewing" | "error";
-
-type ApiArtifact = {
-  title: string;
-  code: string;
-  message: string;
-  model?: string;
-  parts?: StudioPart[];
-  sources?: StudioSource[];
-};
 
 type CompileOutcome = {
   ok: boolean;
@@ -70,9 +91,12 @@ type StudioState = {
   logs: string;
   compileMs: number;
   prompt: string;
-  refine: string;
   referenceImage: StudioImage | null;
   printProfile: PrintProfile | null;
+  inspection: StudioInspection | null;
+  pendingQuestion: AgentQuestion | null;
+  agentMessages: AgentUiMessage[];
+  agentActivity: string[];
   messages: StudioMessage[];
   model: string;
   activeTab: "parameters" | "code";
@@ -87,11 +111,12 @@ type StudioState = {
   importScad: (code: string, title?: string) => Promise<void>;
   newPart: () => void;
   generate: (prompt?: string) => Promise<void>;
-  refineModel: (message?: string) => Promise<void>;
   setPrompt: (value: string) => void;
-  setRefine: (value: string) => void;
   setReferenceImage: (image: StudioImage | null) => void;
   setPrintProfile: (profile: PrintProfile | null) => void;
+  stopAgent: () => void;
+  answerQuestion: (answer: string) => Promise<void>;
+  runAgent: (token: number) => Promise<void>;
   setParam: (name: string, value: number | boolean) => void;
   applyCode: (code: string) => Promise<void>;
   setCodeDraft: (code: string) => void;
@@ -102,6 +127,7 @@ type StudioState = {
   setShowEdges: (value: boolean) => void;
   setShowGrid: (value: boolean) => void;
   exportStl: () => Promise<void>;
+  exportParts: () => Promise<void>;
   exportScad: () => void;
   shareLink: () => string | null;
 };
@@ -146,6 +172,13 @@ function message(
   return { id: uid(), role, text, note, sources, image, time: timeNow() };
 }
 
+function completedAgentHistory(messages: AgentUiMessage[]) {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index].role === "user") return messages.slice(0, index);
+  }
+  return [];
+}
+
 function makeModelLabel(model?: string) {
   if (!model) return undefined;
   if (/deepseek/i.test(model)) return model.includes("pro") ? "DeepSeek V4 Pro" : "DeepSeek V4.1 Flash";
@@ -166,6 +199,13 @@ async function evaluateCode(code: string): Promise<CompileOutcome> {
         triangles: preview.triangles,
         components: preview.components,
         floating: preview.floating,
+        boundaryEdges: preview.boundaryEdges,
+        nonManifoldEdges: preview.nonManifoldEdges,
+        volume: preview.volume,
+        surfaceArea: preview.surfaceArea,
+        overhangArea: preview.overhangArea,
+        overhangPercent: preview.overhangPercent,
+        componentIds: preview.componentIds,
         bounds: preview.bounds,
       },
       params,
@@ -184,98 +224,6 @@ async function evaluateCode(code: string): Promise<CompileOutcome> {
   }
 }
 
-async function repairArtifact(
-  code: string,
-  error: string,
-  parts: StudioPart[],
-  sessionIdValue: string,
-): Promise<ApiArtifact> {
-  const response = await fetch("/api/studio/repair", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      code,
-      error,
-      parts: parts.map((part) => part.quantity > 1 ? `${part.name} (qty ${part.quantity})` : part.name),
-      sessionId: sessionIdValue,
-    }),
-  });
-  const payload = await response.json();
-  if (!response.ok || !payload.code) {
-    throw new Error(payload.error ?? "The repair pass did not return code");
-  }
-  return {
-    title: payload.title ?? "Repaired model",
-    code: payload.code,
-    message: payload.message ?? "Fixed the model.",
-    model: payload.model,
-    parts: normalizeParts(payload.parts, parts),
-    sources: Array.isArray(payload.sources) ? payload.sources : [],
-  };
-}
-
-async function reviewArtifact(input: {
-  code: string;
-  parts: StudioPart[];
-  prompt: string;
-  profile: PrintProfile | null;
-  referenceImage: string;
-  render: string;
-  metrics: string;
-  sessionIdValue: string;
-}): Promise<ApiArtifact> {
-  const response = await fetch("/api/studio/review", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      code: input.code,
-      parts: input.parts,
-      prompt: input.prompt,
-      profile: input.profile ?? undefined,
-      referenceImage: input.referenceImage,
-      render: input.render,
-      metrics: input.metrics,
-      sessionId: input.sessionIdValue,
-    }),
-  });
-  const payload = await response.json();
-  if (!response.ok || !payload.code) {
-    throw new Error(payload.error ?? "The visual check did not return a model");
-  }
-  return {
-    title: payload.title ?? "Reviewed model",
-    code: payload.code,
-    message: payload.message ?? "Checked the model against the image.",
-    model: payload.model,
-    parts: normalizeParts(payload.parts),
-    sources: [],
-  };
-}
-
-async function captureRender(): Promise<string | null> {
-  if (typeof document === "undefined") return null;
-  let source: HTMLCanvasElement | null = null;
-  const started = Date.now();
-  while (Date.now() - started < 5000) {
-    source = document.querySelector<HTMLCanvasElement>(".studio-stage canvas");
-    if (source && source.width > 10 && source.height > 10) break;
-    source = null;
-    await new Promise((resolve) => setTimeout(resolve, 150));
-  }
-  if (!source) return null;
-  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-  const scale = Math.min(1, 1200 / Math.max(source.width, source.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(source.width * scale));
-  canvas.height = Math.max(1, Math.round(source.height * scale));
-  const context = canvas.getContext("2d");
-  if (!context) return null;
-  context.fillStyle = "#f1eee5";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(source, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.82);
-}
-
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -287,87 +235,12 @@ function downloadBlob(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-function normalizeParts(value: unknown, fallback: StudioPart[] = []): StudioPart[] {
-  if (!Array.isArray(value)) return fallback;
-  const merged = new Map<string, number>();
-  for (const entry of value) {
-    let name = "";
-    let quantity = 1;
-    if (typeof entry === "string") {
-      name = entry.trim();
-    } else if (entry && typeof entry === "object") {
-      const item = entry as Record<string, unknown>;
-      if (typeof item.name === "string") name = item.name.trim();
-      if (typeof item.quantity === "number" && Number.isFinite(item.quantity)) {
-        quantity = Math.max(1, Math.min(24, Math.round(item.quantity)));
-      }
-    }
-    if (!name) continue;
-    merged.set(name, Math.min(24, (merged.get(name) ?? 0) + quantity));
-  }
-  const result = [...merged.entries()].slice(0, 12).map(([name, quantity]) => ({ name, quantity }));
-  return result.length ? result : fallback;
-}
-
 function expectedBodies(parts: StudioPart[]) {
   return parts.reduce((sum, part) => sum + Math.max(1, part.quantity), 0);
 }
 
 function safeName(title: string) {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60) || "cadgo-part";
-}
-
-function changedLineCount(before: string, after: string) {
-  const a = before.split("\n");
-  const b = after.split("\n");
-  let previous = new Uint16Array(b.length + 1);
-  let current = new Uint16Array(b.length + 1);
-  for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) {
-      current[j] = a[i - 1] === b[j - 1] ? previous[j - 1] + 1 : Math.max(previous[j], current[j - 1]);
-    }
-    const swap = previous;
-    previous = current;
-    current = swap;
-    current.fill(0);
-  }
-  return Math.max(a.length, b.length) - previous[b.length];
-}
-
-
-function geometryIssue(outcome: CompileOutcome, parts: StudioPart[]) {
-  if (!outcome.ok || !outcome.mesh) {
-    return outcome.error ?? outcome.logs ?? "The kernel could not build this model.";
-  }
-  if (!parts.length) return null;
-  const bodies = outcome.mesh.components;
-  const expected = expectedBodies(parts);
-  if (bodies !== expected) {
-    return `The kernel found ${bodies} connected bod${bodies === 1 ? "y" : "ies"} but the parts manifest expects ${expected} bod${expected === 1 ? "y" : "ies"}. Keep every declared part instance its own watertight body with 0.2-0.8 mm clearance at mating faces; do not union distinct parts. If one part type has quantity 2, model two separate instances, not one fused pair.`;
-  }
-  return null;
-}
-
-function artifactNote(
-  artifact: ApiArtifact,
-  outcome: CompileOutcome,
-  repaired: number,
-  visualChecked = false,
-  parametric?: { ok: boolean; params: number },
-) {
-  const label = makeModelLabel(artifact.model) ?? "Design compiler";
-  const parts = artifact.parts ?? [];
-  const bodyCount = outcome.mesh?.components ?? 0;
-  const bits = [label];
-  if (bodyCount) bits.push(`${bodyCount} bod${bodyCount === 1 ? "y" : "ies"}`);
-  if (parts.length > 1) bits.push(`${parts.length} part types`);
-  if (parts.length && bodyCount !== expectedBodies(parts)) bits.push("body mismatch");
-  if (parametric?.ok) bits.push(`fully parametric · ${parametric.params} params`);
-  else if (parametric && !parametric.ok) bits.push("hardcoded dimensions remain");
-  if (artifact.sources?.length) bits.push(`${artifact.sources.length} source${artifact.sources.length === 1 ? "" : "s"}`);
-  if (visualChecked) bits.push("visual check");
-  if (repaired) bits.push(repaired === 1 ? "quality-repaired" : `quality-repaired ×${repaired}`);
-  return bits.join(" · ");
 }
 
 export const useStudio = create<StudioState>((set, get) => ({
@@ -383,9 +256,12 @@ export const useStudio = create<StudioState>((set, get) => ({
   logs: "",
   compileMs: 0,
   prompt: "",
-  refine: "",
   referenceImage: null,
   printProfile: null,
+  inspection: null,
+  pendingQuestion: null,
+  agentMessages: [],
+  agentActivity: [],
   messages: [],
   model: "",
   activeTab: "parameters",
@@ -401,7 +277,23 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (compileTimer) clearTimeout(compileTimer);
     const fromHash = await get().loadFromHash();
     if (fromHash) return;
-    set({ booted: true, status: "idle" });
+    set({ booted: true, status: "booting" });
+    try {
+      await scadClient().warm();
+      set((state) => ({
+        booted: true,
+        status: state.status === "booting" ? "idle" : state.status,
+        error: state.status === "booting" ? null : state.error,
+      }));
+    } catch (error) {
+      set((state) => ({
+        booted: true,
+        status: state.status === "booting" ? "error" : state.status,
+        error: state.status === "booting"
+          ? error instanceof Error ? error.message : "The local CAD kernel did not start in this browser."
+          : state.error,
+      }));
+    }
   },
 
   loadFromHash: async () => {
@@ -430,6 +322,10 @@ export const useStudio = create<StudioState>((set, get) => ({
         parts: [],
         referenceImage: null,
         printProfile: null,
+        inspection: null,
+        pendingQuestion: null,
+        agentMessages: [],
+        agentActivity: [],
         params: outcome.params,
         values: outcome.values,
         mesh: outcome.mesh,
@@ -458,6 +354,10 @@ export const useStudio = create<StudioState>((set, get) => ({
       parts: [],
       referenceImage: null,
       printProfile: null,
+      inspection: null,
+      pendingQuestion: null,
+      agentMessages: [],
+      agentActivity: [],
       params: [],
       values: {},
       mesh: null,
@@ -466,7 +366,6 @@ export const useStudio = create<StudioState>((set, get) => ({
       logs: "",
       compileMs: 0,
       prompt: "",
-      refine: "",
       messages: [],
       model: "",
       activeTab: "parameters",
@@ -491,6 +390,10 @@ export const useStudio = create<StudioState>((set, get) => ({
       parts: [],
       referenceImage: null,
       printProfile: null,
+      inspection: null,
+      pendingQuestion: null,
+      agentMessages: [],
+      agentActivity: [],
       prompt: "",
       messages: [...get().messages, message("user", `Imported ${name}.scad`)],
     });
@@ -544,6 +447,10 @@ export const useStudio = create<StudioState>((set, get) => ({
       parts: [],
       referenceImage: null,
       printProfile: null,
+      inspection: null,
+      pendingQuestion: null,
+      agentMessages: [],
+      agentActivity: [],
       messages: [...get().messages, message("user", example.prompt), message("ai", `${example.title} loaded from the benchbook.`)],
     });
     const outcome = await evaluateCode(example.code);
@@ -569,310 +476,354 @@ export const useStudio = create<StudioState>((set, get) => ({
     const prompt = (promptInput ?? get().prompt).trim();
     if (!prompt) return;
     const image = get().referenceImage;
-    const profile = get().printProfile;
+    const currentCode = get().code;
+    const printProfile = get().printProfile;
+    const wasBusy = ["drafting", "compiling", "reviewing"].includes(get().status);
     const token = ++requestSeq;
     currentAbort?.abort();
     currentAbort = new AbortController();
+    const baseConversation = wasBusy ? completedAgentHistory(get().agentMessages) : get().agentMessages;
+    const content: Record<string, unknown>[] = [
+      {
+        type: "text",
+        text: `${prompt}${printProfile ? `\n\nUSER-PROVIDED PRINT / PROCESS SETUP:\n${JSON.stringify(printProfile, null, 2)}` : ""}${currentCode ? `\n\nCURRENT OPENSCAD SOURCE:\n${currentCode}` : ""}`,
+      },
+    ];
+    if (image) content.push({ type: "image_url", image_url: { url: image.dataUrl } });
+    const userMessage: AgentUiMessage = { role: "user", content };
     set({
       status: "drafting",
       error: null,
       prompt: "",
+      pendingQuestion: null,
+      agentMessages: [...baseConversation, userMessage],
+      agentActivity: ["Reading your message"],
       messages: [...get().messages, message("user", prompt, undefined, undefined, image ?? undefined)],
     });
-    try {
-      const response = await fetch("/api/studio/generate", {
+    await get().runAgent(token);
+  },
+
+  runAgent: async (token) => {
+    const signal = currentAbort?.signal;
+    if (!signal) return;
+    const callAgent = async (messages: AgentUiMessage[]) => {
+      const response = await fetch("/api/studio/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          image: image ?? undefined,
-          profile: profile ?? undefined,
-          sessionId: sessionId(),
-        }),
-        signal: currentAbort.signal,
+        body: JSON.stringify({ messages, sessionId: sessionId() }),
+        signal,
       });
-      if (token !== requestSeq) return;
-      const payload = await response.json();
-      if (!response.ok || !payload.code) throw new Error(payload.error ?? "The design compiler did not return a model");
-      let artifact: ApiArtifact = {
-        title: payload.title ?? "OpenSCAD model",
-        code: payload.code,
-        message: payload.message ?? "Drafted the model.",
-        model: payload.model,
-        parts: normalizeParts(payload.parts),
-        sources: Array.isArray(payload.sources) ? payload.sources : [],
+      const text = await response.text();
+      let payload: Record<string, unknown>;
+      try {
+        payload = JSON.parse(text) as Record<string, unknown>;
+      } catch {
+        const html = text.trim().startsWith("<");
+        throw new Error(
+          html
+            ? `The agent API returned an HTML page (HTTP ${response.status}). This deployment does not expose the studio agent route.`
+            : `The agent API returned an unreadable response (HTTP ${response.status}).`,
+        );
+      }
+      if (!response.ok) {
+        throw new Error(
+          typeof payload.error === "string"
+            ? payload.error
+            : `The CAD agent endpoint returned HTTP ${response.status}.`,
+        );
+      }
+      return payload as {
+        content: string;
+        tool_calls: { id?: string; function?: { name?: string; arguments?: string | Record<string, unknown> } }[];
+        model: string;
       };
-      set({ status: "compiling" });
-      let outcome = await evaluateCode(artifact.code);
-      let repaired = 0;
-      while (geometryIssue(outcome, artifact.parts ?? []) && repaired < 2) {
-        if (token !== requestSeq) return;
-        const issue = geometryIssue(outcome, artifact.parts ?? []);
-        if (!issue) break;
-        repaired++;
-        set({ status: "repairing" });
-        try {
-          artifact = await repairArtifact(artifact.code, issue, artifact.parts ?? [], sessionId());
-        } catch (error) {
-          throw new Error(error instanceof Error ? error.message : "The repair pass failed");
-        }
-        outcome = await evaluateCode(artifact.code);
+    };
+    const parseArgs = (value: string | Record<string, unknown> | undefined) => {
+      if (!value) return null;
+      if (typeof value === "object") return value;
+      try {
+        return JSON.parse(value) as Record<string, unknown>;
+      } catch {
+        return null;
       }
-      let visualChecked = false;
-      if (image && outcome.ok && outcome.mesh && outcome.params && outcome.values && token === requestSeq) {
-        const reviewMesh = outcome.mesh;
-        const bounds = reviewMesh.bounds;
-        const dims = [bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1], bounds.max[2] - bounds.min[2]]
-          .map((value) => Math.round(value));
-        set({
-          status: "reviewing",
-          mesh: reviewMesh,
-          params: outcome.params,
-          values: outcome.values,
-          code: artifact.code,
-          codeDraft: artifact.code,
-          title: artifact.title,
-          parts: artifact.parts ?? [],
-          logs: outcome.logs ?? "",
-          compileMs: Math.round(outcome.duration ?? 0),
-          error: null,
-          fitKey: get().fitKey + 1,
-        });
-        await new Promise((resolve) => setTimeout(resolve, 900));
-        const render = await captureRender();
-        if (render && token === requestSeq) {
-          try {
-            const reviewed = await reviewArtifact({
-              code: artifact.code,
-              parts: artifact.parts ?? [],
-              prompt,
-              profile,
-              referenceImage: image.dataUrl,
-              render,
-              metrics: `Envelope ${dims.join("x")} mm; ${reviewMesh.components} connected bodies; ${reviewMesh.triangles} triangles; ${(artifact.parts ?? []).length} part types.`,
-              sessionIdValue: sessionId(),
-            });
-            visualChecked = true;
-            if (reviewed.code && reviewed.code !== artifact.code) {
-              const previous = artifact;
-              const previousOutcome = outcome;
-              artifact = {
-                ...artifact,
-                code: reviewed.code,
-                title: reviewed.title || artifact.title,
-                message: reviewed.message || artifact.message,
-                parts: reviewed.parts?.length ? reviewed.parts : artifact.parts,
-              };
-              set({ status: "compiling" });
-              outcome = await evaluateCode(artifact.code);
-              let visualRepairs = 0;
-              while (geometryIssue(outcome, artifact.parts ?? []) && visualRepairs < 1) {
-                if (token !== requestSeq) return;
-                const issue = geometryIssue(outcome, artifact.parts ?? []);
-                if (!issue) break;
-                visualRepairs++;
-                repaired++;
-                set({ status: "repairing" });
-                artifact = await repairArtifact(artifact.code, issue, artifact.parts ?? [], sessionId());
-                outcome = await evaluateCode(artifact.code);
-              }
-              if (geometryIssue(outcome, artifact.parts ?? [])) {
-                artifact = {
-                  ...previous,
-                  message: `${reviewed.message} Kept the compiled version because the visual correction did not pass the body check.`,
-                };
-                outcome = previousOutcome;
-              }
-            } else if (reviewed.message) {
-              artifact = { ...artifact, message: reviewed.message };
+    };
+    const pushActivity = (line: string) => set({ agentActivity: [...get().agentActivity.slice(-8), line] });
+    let builds = 0;
+
+    try {
+      while (true) {
+        if (token !== requestSeq) return;
+        set({ status: "drafting" });
+        pushActivity("Thinking");
+        const assistant = await callAgent(get().agentMessages);
+        if (token !== requestSeq) return;
+        const calls = assistant.tool_calls ?? [];
+        const assistantMessage: AgentUiMessage = {
+          role: "assistant",
+          content: assistant.content ?? "",
+          tool_calls: calls,
+        };
+        set({ agentMessages: [...get().agentMessages, assistantMessage] });
+        if (!calls.length) {
+          const text = assistant.content.trim() || "Done.";
+          set({
+            status: "idle",
+            agentActivity: [],
+            pendingQuestion: null,
+            messages: [
+              ...get().messages,
+              message("ai", text, `${makeModelLabel(assistant.model) ?? "Design compiler"} · chat`),
+            ],
+          });
+          return;
+        }
+
+        let finalText: string | null = null;
+        let asked: AgentQuestion | null = null;
+        let didTool = false;
+
+        for (const call of calls) {
+          const name = call.function?.name;
+          const id = call.id ?? `tool-${Date.now()}`;
+          if (name === "ask_user") {
+            const raw = parseArgs(call.function?.arguments);
+            const question = typeof raw?.question === "string" ? raw.question.trim() : "";
+            if (!question) {
+              set({ agentMessages: [...get().agentMessages, { role: "tool", tool_call_id: id, content: JSON.stringify({ ok: false, error: "A question is required." }) }] });
+              continue;
             }
-          } catch {
-            // A failed visual check should not discard a valid model.
+            const options = Array.isArray(raw?.options)
+              ? raw.options.flatMap((item) => {
+                  if (!item || typeof item !== "object") return [];
+                  const record = item as Record<string, unknown>;
+                  return typeof record.label === "string"
+                    ? [{ label: record.label, description: typeof record.description === "string" ? record.description : undefined }]
+                    : [];
+                })
+              : [];
+            asked = {
+              toolCallId: id,
+              question,
+              header: typeof raw?.header === "string" ? raw.header : undefined,
+              options,
+              allowCustom: raw?.allowCustom !== false,
+            };
+            continue;
           }
+
+          if (name === "build_model") {
+            didTool = true;
+            const raw = parseArgs(call.function?.arguments);
+            const code = typeof raw?.code === "string" ? raw.code.trim().replace(/^```(?:scad|openscad)?\s*/i, "").replace(/```\s*$/, "").trim() : "";
+            if (!code) {
+              set({ agentMessages: [...get().agentMessages, { role: "tool", tool_call_id: id, content: JSON.stringify({ ok: false, error: "build_model needs complete OpenSCAD code." }) }] });
+              continue;
+            }
+            const parametric = auditParameterization(code);
+            if (!parametric.ok) {
+              set({ agentMessages: [...get().agentMessages, { role: "tool", tool_call_id: id, content: JSON.stringify({ ok: false, error: parametric.message }) }] });
+              pushActivity("Parametric audit failed · model will revise");
+              continue;
+            }
+            const title = typeof raw?.title === "string" && raw.title.trim() ? raw.title.trim().slice(0, 80) : get().title;
+            builds++;
+            set({ status: "compiling" });
+            pushActivity(`Compiling build ${builds}`);
+            const outcome = await evaluateCode(code);
+            if (token !== requestSeq) return;
+            if (!outcome.ok || !outcome.mesh || !outcome.params || !outcome.values) {
+              const issue = outcome.error ?? "The code did not compile.";
+              set({ status: "drafting", agentMessages: [...get().agentMessages, { role: "tool", tool_call_id: id, content: JSON.stringify({ ok: false, error: issue }) }] });
+              pushActivity("Compile failed · model will revise");
+              continue;
+            }
+            set({
+              mesh: outcome.mesh,
+              params: outcome.params,
+              values: outcome.values,
+              code,
+              codeDraft: code,
+              title,
+              parts: [],
+              status: "reviewing",
+              error: null,
+              logs: outcome.logs ?? "",
+              compileMs: Math.round(outcome.duration ?? 0),
+              activeTab: "parameters",
+              fitKey: get().fitKey + 1,
+              agentMessages: [...get().agentMessages, {
+                role: "tool",
+                tool_call_id: id,
+                content: JSON.stringify({
+                  ok: true,
+                  title,
+                  bodies: outcome.mesh.components,
+                  triangles: outcome.mesh.triangles,
+                  bounds: outcome.mesh.bounds,
+                  compileMs: Math.round(outcome.duration ?? 0),
+                  params: parametric.params,
+                }),
+              }],
+            });
+            pushActivity(`Compiled ${title} · ${outcome.mesh.components} bodies · ${parametric.params} params`);
+            continue;
+          }
+
+          if (name === "render_views") {
+            didTool = true;
+            const raw = parseArgs(call.function?.arguments);
+            const views = Array.isArray(raw?.views) ? raw.views.filter((view): view is string => typeof view === "string") : [];
+            const mesh = get().mesh;
+            if (!mesh) {
+              set({ agentMessages: [...get().agentMessages, { role: "tool", tool_call_id: id, content: JSON.stringify({ ok: false, error: "Build a model before rendering views." }) }] });
+              continue;
+            }
+            if (!views.length) {
+              set({ agentMessages: [...get().agentMessages, { role: "tool", tool_call_id: id, content: JSON.stringify({ ok: false, error: "Choose one or more views." }) }] });
+              continue;
+            }
+            set({ status: "reviewing" });
+            pushActivity(`Rendering ${views.join(", ")}`);
+            try {
+              const sheet = await renderInspectionSheet(mesh, get().title, views);
+              if (token !== requestSeq) return;
+              set({
+                inspection: { ...sheet, iteration: builds, title: get().title },
+                agentMessages: [
+                  ...get().agentMessages,
+                  {
+                    role: "tool",
+                    tool_call_id: id,
+                    content: JSON.stringify({ ok: true, views: sheet.views, bodies: mesh.components, triangles: mesh.triangles }),
+                  },
+                  {
+                    role: "user",
+                    content: [
+                      { type: "text", text: `Inspection sheet for ${sheet.views.join(", ")}. Use it as evidence; render more views or revise if needed.` },
+                      { type: "image_url", image_url: { url: sheet.dataUrl } },
+                    ],
+                  },
+                ],
+                status: "drafting",
+              });
+              pushActivity(`Inspection sheet ready · ${sheet.views.join(", ")}`);
+            } catch (error) {
+              const issue = error instanceof Error ? error.message : "Could not render the inspection sheet.";
+              set({ agentMessages: [...get().agentMessages, { role: "tool", tool_call_id: id, content: JSON.stringify({ ok: false, error: issue }) }], status: "drafting" });
+              pushActivity("Inspection render failed");
+            }
+            continue;
+          }
+
+          if (name === "answer_user") {
+            const raw = parseArgs(call.function?.arguments);
+            finalText = typeof raw?.message === "string" ? raw.message.trim() : "";
+            set({
+              agentMessages: [
+                ...get().agentMessages,
+                { role: "tool", tool_call_id: id, content: JSON.stringify({ ok: true, delivered: true }) },
+              ],
+            });
+            continue;
+          }
+
+          set({ agentMessages: [...get().agentMessages, { role: "tool", tool_call_id: id, content: JSON.stringify({ ok: false, error: `Unknown tool ${name ?? "call"}.` }) }] });
+        }
+
+        if (finalText !== null) {
+          const text = finalText || (get().mesh ? "Done." : assistant.content.trim() || "Done.");
+          if (asked) {
+            set({
+              agentMessages: [
+                ...get().agentMessages,
+                {
+                  role: "tool",
+                  tool_call_id: asked.toolCallId,
+                  content: JSON.stringify({ ok: false, error: "The agent finished with a final answer instead of asking." }),
+                },
+              ],
+            });
+          }
+          set({
+            status: "idle",
+            agentActivity: [],
+            pendingQuestion: null,
+            messages: [
+              ...get().messages,
+              message("ai", text, `${makeModelLabel(assistant.model) ?? "Design compiler"} · ${builds} build${builds === 1 ? "" : "s"}`),
+            ],
+          });
+          return;
+        }
+
+        if (asked) {
+          set({
+            status: "idle",
+            pendingQuestion: asked,
+            agentActivity: ["Waiting for your answer"],
+          });
+          return;
+        }
+
+        if (!didTool) {
+          const text = assistant.content.trim() || "The agent did not return a model.";
+          set({
+            status: "idle",
+            agentActivity: [],
+            messages: [
+              ...get().messages,
+              message("ai", text, `${makeModelLabel(assistant.model) ?? "Design compiler"} · chat`),
+            ],
+          });
+          return;
         }
       }
-      let parametric = auditParameterization(artifact.code);
-      let parametricRepairs = 0;
-      while (!parametric.ok && parametricRepairs < 2 && token === requestSeq) {
-        parametricRepairs++;
-        repaired++;
-        set({ status: "repairing" });
-        try {
-          artifact = await repairArtifact(artifact.code, parametric.message, artifact.parts ?? [], sessionId());
-        } catch {
-          break;
-        }
-        outcome = await evaluateCode(artifact.code);
-        parametric = auditParameterization(artifact.code);
-      }
-      let postAuditRepairs = 0;
-      while (outcome.ok && outcome.mesh && geometryIssue(outcome, artifact.parts ?? []) && postAuditRepairs < 1) {
-        if (token !== requestSeq) return;
-        const issue = geometryIssue(outcome, artifact.parts ?? []);
-        if (!issue) break;
-        postAuditRepairs++;
-        repaired++;
-        set({ status: "repairing" });
-        try {
-          artifact = await repairArtifact(artifact.code, issue, artifact.parts ?? [], sessionId());
-        } catch {
-          break;
-        }
-        outcome = await evaluateCode(artifact.code);
-      }
-      parametric = auditParameterization(artifact.code);
-      if (token !== requestSeq) return;
-      if (!outcome.ok || !outcome.mesh || !outcome.params || !outcome.values) {
-        set({
-          status: "error",
-          error: outcome.error ?? "The model did not compile after repair.",
-          logs: outcome.logs ?? "",
-          code: artifact.code,
-          codeDraft: artifact.code,
-          title: artifact.title,
-          parts: artifact.parts ?? [],
-        });
-        set({ messages: [...get().messages, message("system", "The drafter returned code the kernel could not build.")] });
-        return;
-      }
-      set({
-        title: artifact.title,
-        code: artifact.code,
-        codeDraft: artifact.code,
-        parts: artifact.parts ?? [],
-        params: outcome.params,
-        values: outcome.values,
-        mesh: outcome.mesh,
-        status: "idle",
-        error: null,
-        logs: outcome.logs ?? "",
-        compileMs: Math.round(outcome.duration ?? 0),
-        activeTab: "parameters",
-        fitKey: get().fitKey + 1,
-        model: artifact.model ?? "",
-        messages: [
-          ...get().messages,
-          message(
-            "ai",
-            artifact.message,
-            artifactNote(artifact, outcome, repaired, visualChecked, parametric),
-            artifact.sources,
-          ),
-        ],
-      });
     } catch (error) {
       if (token !== requestSeq || (error instanceof Error && error.name === "AbortError")) return;
+      const message = error instanceof Error ? error.message : "The CAD agent failed.";
       set({
-        status: "error",
-        error: error instanceof Error ? error.message : "The draft failed",
+        status: "idle",
+        agentActivity: [],
+        error: message,
+        agentMessages: completedAgentHistory(get().agentMessages),
       });
     }
   },
 
-  refineModel: async (messageInput) => {
-    const text = (messageInput ?? get().refine).trim();
-    const code = get().code;
-    if (!text || !code) return;
+  answerQuestion: async (answer) => {
+    const question = get().pendingQuestion;
+    if (!question) return;
     const token = ++requestSeq;
     currentAbort?.abort();
     currentAbort = new AbortController();
     set({
+      pendingQuestion: null,
       status: "drafting",
       error: null,
-      refine: "",
-      messages: [...get().messages, message("user", text)],
+      agentActivity: ["Continuing with your answer"],
+      messages: [...get().messages, message("user", answer)],
+      agentMessages: [
+        ...get().agentMessages,
+        { role: "tool", tool_call_id: question.toolCallId, content: JSON.stringify({ answer }) },
+      ],
     });
-    try {
-      const response = await fetch("/api/studio/edit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code,
-          message: text,
-          parts: get().parts.map((part) => part.quantity > 1 ? `${part.name} (qty ${part.quantity})` : part.name),
-          sessionId: sessionId(),
-        }),
-        signal: currentAbort.signal,
-      });
-      if (token !== requestSeq) return;
-      const payload = await response.json();
-      if (!response.ok || !payload.code) throw new Error(payload.error ?? "The revision did not return code");
-      let artifact: ApiArtifact = {
-        title: payload.title ?? get().title,
-        code: payload.code,
-        message: payload.message ?? "Revised the model.",
-        model: payload.model,
-        parts: normalizeParts(payload.parts, get().parts),
-        sources: Array.isArray(payload.sources) ? payload.sources : [],
-      };
-      set({ status: "compiling" });
-      let outcome = await evaluateCode(artifact.code);
-      let repaired = 0;
-      while (geometryIssue(outcome, artifact.parts ?? []) && repaired < 2) {
-        if (token !== requestSeq) return;
-        const issue = geometryIssue(outcome, artifact.parts ?? []);
-        if (!issue) break;
-        repaired++;
-        set({ status: "repairing" });
-        artifact = await repairArtifact(artifact.code, issue, artifact.parts ?? [], sessionId());
-        outcome = await evaluateCode(artifact.code);
-      }
-      let parametric = auditParameterization(artifact.code);
-      let parametricRepairs = 0;
-      while (!parametric.ok && parametricRepairs < 2 && token === requestSeq) {
-        parametricRepairs++;
-        repaired++;
-        set({ status: "repairing" });
-        try {
-          artifact = await repairArtifact(artifact.code, parametric.message, artifact.parts ?? [], sessionId());
-        } catch {
-          break;
-        }
-        outcome = await evaluateCode(artifact.code);
-        parametric = auditParameterization(artifact.code);
-      }
-      if (token !== requestSeq) return;
-      if (!outcome.ok || !outcome.mesh || !outcome.params || !outcome.values) {
-        set({
-          status: "error",
-          error: outcome.error ?? "The revision did not compile.",
-          logs: outcome.logs ?? "",
-        });
-        return;
-      }
-      const changed = changedLineCount(code, artifact.code);
-      set({
-        title: artifact.title,
-        code: artifact.code,
-        codeDraft: artifact.code,
-        parts: artifact.parts ?? [],
-        params: outcome.params,
-        values: outcome.values,
-        mesh: outcome.mesh,
-        status: "idle",
-        logs: outcome.logs ?? "",
-        compileMs: Math.round(outcome.duration ?? 0),
-        activeTab: "parameters",
-        fitKey: get().fitKey + 1,
-        model: artifact.model ?? "",
-        messages: [
-          ...get().messages,
-          message(
-            "ai",
-            artifact.message,
-            `Edited in place · ${changed} line${changed === 1 ? "" : "s"} changed · ${artifactNote(artifact, outcome, repaired, false, parametric)}`,
-            artifact.sources,
-          ),
-        ],
-      });
-    } catch (error) {
-      if (token !== requestSeq || (error instanceof Error && error.name === "AbortError")) return;
-      set({ status: "error", error: error instanceof Error ? error.message : "The revision failed" });
-    }
+    await get().runAgent(token);
+  },
+
+  stopAgent: () => {
+    requestSeq++;
+    currentAbort?.abort();
+    currentAbort = null;
+    set({
+      status: "idle",
+      pendingQuestion: null,
+      agentActivity: [],
+      agentMessages: [],
+      error: null,
+    });
   },
 
   setPrompt: (value) => set({ prompt: value }),
-  setRefine: (value) => set({ refine: value }),
   setReferenceImage: (referenceImage) => set({ referenceImage }),
   setPrintProfile: (printProfile) => set({ printProfile }),
   setCodeDraft: (value) => set({ codeDraft: value }),
@@ -885,7 +836,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       param.name === name ? { ...param, value } : param,
     );
     const values = parametersToValues(params);
-    set({ code: nextCode, codeDraft: nextCode, params, values, status: "compiling", error: null });
+    set({ code: nextCode, codeDraft: nextCode, params, values, status: "compiling", error: null, inspection: null });
     if (compileTimer) clearTimeout(compileTimer);
     compileTimer = setTimeout(async () => {
       const seq = ++compileSeq;
@@ -909,7 +860,7 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   applyCode: async (code) => {
     const seq = ++compileSeq;
-    set({ status: "compiling", error: null, code, codeDraft: code, parts: [] });
+    set({ status: "compiling", error: null, code, codeDraft: code, parts: [], inspection: null });
     const outcome = await evaluateCode(code);
     if (seq !== compileSeq) return;
     if (!outcome.ok || !outcome.mesh || !outcome.params || !outcome.values) {
@@ -956,8 +907,26 @@ export const useStudio = create<StudioState>((set, get) => ({
   setShowGrid: (showGrid) => set({ showGrid }),
 
   exportStl: async () => {
-    const { code, values, title, mesh } = get();
+    const { code, values, title, mesh, parts, printProfile } = get();
     if (!code || !mesh) return;
+    const expected = expectedBodies(parts);
+    if (mesh.boundaryEdges > 0 || mesh.nonManifoldEdges > 0) {
+      useToast.getState().notify("Export blocked: the mesh is not watertight.", "accent");
+      return;
+    }
+    if (parts.length && mesh.components !== expected) {
+      useToast.getState().notify(`Export blocked: ${mesh.components} bodies for ${expected} declared parts.`, "accent");
+      return;
+    }
+    if (printProfile?.purpose === "3d-print" && printProfile.bed) {
+      const bounds = mesh.bounds;
+      const dims = [bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1], bounds.max[2] - bounds.min[2]];
+      const bed = printProfile.bed;
+      if (dims[0] > bed.x || dims[1] > bed.y || dims[2] > bed.z) {
+        useToast.getState().notify("Export blocked: the part exceeds the declared print bed.", "accent");
+        return;
+      }
+    }
     try {
       useToast.getState().notify("Compiling the STL…");
       const stl = await scadClient().exportStl(code, values);
@@ -966,6 +935,32 @@ export const useStudio = create<StudioState>((set, get) => ({
     } catch (error) {
       useToast.getState().notify(error instanceof Error ? error.message : "STL export failed", "accent");
     }
+  },
+
+  exportParts: async () => {
+    const { mesh, parts, title } = get();
+    if (!mesh || !mesh.componentIds.length) return;
+    if (mesh.boundaryEdges > 0 || mesh.nonManifoldEdges > 0) {
+      useToast.getState().notify("Export blocked: the mesh is not watertight.", "accent");
+      return;
+    }
+    const names: string[] = [];
+    for (const part of parts) {
+      for (let index = 0; index < Math.max(1, part.quantity); index++) {
+        names.push(part.quantity > 1 ? `${part.name} ${index + 1}` : part.name);
+      }
+    }
+    while (names.length < mesh.components) names.push(`Body ${String(names.length + 1).padStart(2, "0")}`);
+    const base = safeName(title);
+    for (let component = 0; component < mesh.components; component++) {
+      const stl = binaryStl(mesh.positions, mesh.componentIds, component);
+      downloadBlob(
+        new Blob([stl.buffer as ArrayBuffer], { type: "model/stl" }),
+        `${base}-${safeName(names[component] ?? `part-${component + 1}`)}.stl`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 180));
+    }
+    useToast.getState().notify(`Downloaded ${mesh.components} separate part STL${mesh.components === 1 ? "" : "s"}`);
   },
 
   exportScad: () => {

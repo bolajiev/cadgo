@@ -2,18 +2,18 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cadgo — AI CAD part studio",
+  title: "Cadgo — AI 3D assembly studio",
   description:
-    "Turn plain language into parametric OpenSCAD parts you can edit, compile and export in the browser. Plus a jointed mechanism lab. Built for the Victoria VR AI Builder Hackathon 2026.",
+    "Describe a part, a mechanical assembly, or a concept 3D scene. Get editable, parametric CAD with local OpenSCAD compilation, an agent that works alongside you, and standard STL/SCAD/JSON exports.",
   openGraph: {
-    title: "Cadgo — AI CAD part studio",
-    description: "Describe a part. Get real CAD.",
+    title: "Cadgo — AI CAD assembly studio",
+    description: "From a sentence to editable parametric CAD.",
     type: "website",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f1eee5",
+  themeColor: "#111318",
   width: "device-width",
   initialScale: 1,
 };

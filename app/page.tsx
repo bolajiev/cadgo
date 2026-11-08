@@ -1,5 +1,5 @@
-import { StudioApp } from "@/components/studio/StudioApp";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <StudioApp />;
+  redirect("/studio");
 }
