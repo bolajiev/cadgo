@@ -27,6 +27,7 @@ import { createV8Study } from "./studies/v8";
 import { createRotaryStudy } from "./studies/rotary";
 import { createHumanoidStudy } from "./studies/humanoid";
 import { createWindTurbineStudy } from "./studies/windTurbine";
+import { createLighthouseStudy } from "./studies/lighthouse";
 
 const LAST_DOCUMENT_KEY = "cadgo:v2:last-document";
 
@@ -88,6 +89,7 @@ type StudioV2State = {
   loadRotaryStudy: () => void;
   loadHumanoidStudy: () => void;
   loadWindTurbineStudy: () => void;
+  loadLighthouseStudy: () => void;
   newPart: () => void;
   importDocument: (document: CadDocument) => void;
   importScad: (code: string, title?: string) => boolean;
@@ -473,6 +475,11 @@ export const useStudioV2 = create<StudioV2State>((set, get) => ({
   loadWindTurbineStudy: () => {
     get().importDocument(createWindTurbineStudy());
     set({ notice: "Wind turbine loaded. Scrub rotor_angle or press play to spin the rotor." });
+  },
+
+  loadLighthouseStudy: () => {
+    get().importDocument(createLighthouseStudy());
+    set({ notice: "Lighthouse scene loaded. Scrub beacon_angle or press play to turn the beacon." });
   },
 
   newPart: () => {

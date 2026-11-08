@@ -4,7 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { auditParameterization } from "@/lib/scad/audit";
 import type { ParameterDef } from "@/lib/scad/params";
-import type { GroupNode, PartDefinition, PartInstance, Transform } from "@/lib/studio/document/types";
+import type {
+  GroupNode,
+  MaterialMode,
+  MaterialRef,
+  PartDefinition,
+  PartInstance,
+  Transform,
+} from "@/lib/studio/document/types";
+import { inferMaterialMode } from "@/lib/studio/v2/material";
 import { useStudioV2 } from "@/lib/studio/v2/store";
 
 function NumberField({
@@ -87,6 +95,200 @@ function TransformEditor({ instance }: { instance: PartInstance }) {
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function MaterialEditor({
+  definition,
+  instance,
+}: {
+  definition: PartDefinition;
+  instance?: PartInstance;
+}) {
+  const run = useStudioV2((state) => state.run);
+  const material = instance?.material ?? definition.material;
+  const mode = instance?.materialMode ?? definition.materialMode ?? inferMaterialMode(material);
+  const [color, setColor] = useState(material.color);
+  const [metalness, setMetalness] = useState(material.metalness);
+  const [roughness, setRoughness] = useState(material.roughness);
+  const [opacity, setOpacity] = useState(material.opacity ?? 1);
+
+  useEffect(() => {
+    setColor(material.color);
+    setMetalness(material.metalness);
+    setRoughness(material.roughness);
+    setOpacity(material.opacity ?? 1);
+  }, [material.color, material.metalness, material.opacity, material.roughness]);
+
+  const commit = (next: Partial<MaterialRef>, nextMode: MaterialMode = mode) => {
+    const base = instance?.material ?? definition.material;
+    const nextMaterial: MaterialRef = { ...base, ...next };
+    if (instance) {
+      const current =
+        useStudioV2.getState().document.instances.find((item) => item.id === instance.id) ?? instance;
+      run({
+        kind: "update_instance",
+        payload: {
+          instanceId: instance.id,
+          patch: { material: nextMaterial, materialMode: nextMode },
+        },
+        targetRevision: current.revision,
+        label: "Set material",
+      });
+      return;
+    }
+    const current =
+      useStudioV2.getState().document.definitions.find((item) => item.id === definition.id) ?? definition;
+    run({
+      kind: "update_definition",
+      payload: {
+        definitionId: definition.id,
+        patch: { material: nextMaterial, materialMode: nextMode },
+      },
+      targetRevision: current.revision,
+      label: "Set material",
+    });
+  };
+
+  const setMode = (nextMode: MaterialMode) => {
+    const base = instance?.material ?? definition.material;
+    if (instance) {
+      const current =
+        useStudioV2.getState().document.instances.find((item) => item.id === instance.id) ?? instance;
+      run({
+        kind: "update_instance",
+        payload: {
+          instanceId: instance.id,
+          patch: { material: instance.material ?? base, materialMode: nextMode },
+        },
+        targetRevision: current.revision,
+        label: "Set material mode",
+      });
+      return;
+    }
+    const current =
+      useStudioV2.getState().document.definitions.find((item) => item.id === definition.id) ?? definition;
+    run({
+      kind: "update_definition",
+      payload: {
+        definitionId: definition.id,
+        patch: { materialMode: nextMode },
+      },
+      targetRevision: current.revision,
+      label: "Set material mode",
+    });
+  };
+
+  const useDefinition = () => {
+    if (!instance) return;
+    const current =
+      useStudioV2.getState().document.instances.find((item) => item.id === instance.id) ?? instance;
+    run({
+      kind: "update_instance",
+      payload: {
+        instanceId: instance.id,
+        patch: { material: undefined, materialMode: undefined },
+      },
+      targetRevision: current.revision,
+      label: "Use definition material",
+    });
+  };
+
+  const commitColor = () => {
+    setColor(color.trim() || material.color);
+    commit({ color }, "override");
+  };
+
+  return (
+    <div className="v2-section">
+      <div className="v2-section-head">
+        <span className="v2-section-label mono">
+          Material · {instance ? (instance.material ? "instance override" : "instance") : "definition"}
+        </span>
+        <div className="v2-material-mode" role="group" aria-label="Material colour source">
+          <button
+            type="button"
+            className={mode === "source" ? "active" : ""}
+            onClick={() => setMode("source")}
+          >
+            Source
+          </button>
+          <button
+            type="button"
+            className={mode === "override" ? "active" : ""}
+            onClick={() => setMode("override")}
+          >
+            Override
+          </button>
+        </div>
+      </div>
+
+      <div className="v2-material-row">
+        <input
+          className="v2-color"
+          type="color"
+          value={color}
+          disabled={mode === "source"}
+          onChange={(event) => setColor(event.target.value)}
+          onBlur={commitColor}
+          aria-label="Material colour"
+        />
+        <span className="mono v2-material-hex">
+          {mode === "source" ? "source color()" : color}
+        </span>
+      </div>
+
+      <label className="v2-material-slider">
+        <span>Metalness</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={metalness}
+          onChange={(event) => setMetalness(Number(event.target.value))}
+          onPointerUp={() => commit({ metalness })}
+          onKeyUp={() => commit({ metalness })}
+        />
+        <span className="mono">{metalness.toFixed(2)}</span>
+      </label>
+      <label className="v2-material-slider">
+        <span>Roughness</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={roughness}
+          onChange={(event) => setRoughness(Number(event.target.value))}
+          onPointerUp={() => commit({ roughness })}
+          onKeyUp={() => commit({ roughness })}
+        />
+        <span className="mono">{roughness.toFixed(2)}</span>
+      </label>
+      <label className="v2-material-slider">
+        <span>Opacity</span>
+        <input
+          type="range"
+          min={0.05}
+          max={1}
+          step={0.05}
+          value={opacity}
+          onChange={(event) => setOpacity(Number(event.target.value))}
+          onPointerUp={() => commit({ opacity })}
+          onKeyUp={() => commit({ opacity })}
+        />
+        <span className="mono">{opacity.toFixed(2)}</span>
+      </label>
+
+      {instance ? (
+        <div className="v2-actions">
+          <button className="btn v2-small" type="button" onClick={useDefinition}>
+            Use definition
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -295,6 +497,8 @@ function DefinitionPanel({ definition }: { definition: PartDefinition }) {
         </div>
       ) : null}
 
+      <MaterialEditor definition={definition} />
+
       <div className="v2-section">
         <span className="v2-section-label mono">Dimensions</span>
         {definition.params.length ? (
@@ -402,6 +606,8 @@ function InstancePanel({ instance }: { instance: PartInstance }) {
           Suppressed
         </label>
       </div>
+
+      {definition ? <MaterialEditor definition={definition} instance={instance} /> : null}
 
       {definition?.params.length ? (
         <div className="v2-section">

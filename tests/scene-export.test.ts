@@ -328,14 +328,14 @@ describe("scene group", () => {
 
 describe("scene GLB", () => {
   it("returns a non-empty ArrayBuffer when the exporter works in this runtime", async () => {
-    let buffer: ArrayBuffer | null = null;
+    let result: Awaited<ReturnType<typeof buildSceneGlb>> | null = null;
     let failure: unknown = null;
     try {
-      buffer = await buildSceneGlb(makeDocument(), makeVariants());
+      result = await buildSceneGlb(makeDocument(), makeVariants());
     } catch (error) {
       failure = error;
     }
-    if (!buffer) {
+    if (!result) {
       console.warn(
         `Scene GLB assertion skipped in this runtime: ${
           failure instanceof Error ? failure.message : "exporter unavailable"
@@ -343,7 +343,8 @@ describe("scene GLB", () => {
       );
       return;
     }
-    expect(buffer.byteLength).toBeGreaterThan(0);
-    expect(new TextDecoder().decode(new Uint8Array(buffer, 0, 4))).toBe("glTF");
+    expect(result.animationCount).toBe(0);
+    expect(result.buffer.byteLength).toBeGreaterThan(0);
+    expect(new TextDecoder().decode(new Uint8Array(result.buffer, 0, 4))).toBe("glTF");
   });
 });

@@ -97,6 +97,14 @@ test("scene export produces a valid GLB and a per-part STL archive", async ({ pa
   expect(glb.readUInt32LE(4)).toBe(2);
   expect(glb.byteLength).toBe(glb.readUInt32LE(8));
 
+  const jsonLength = glb.readUInt32LE(12);
+  expect(glb.readUInt32LE(16)).toBe(0x4e4f534a);
+  const gltf = JSON.parse(glb.subarray(20, 20 + jsonLength).toString("utf8").trim()) as {
+    animations?: { name?: string; channels?: unknown[] }[];
+  };
+  expect(gltf.animations?.length).toBeGreaterThan(0);
+  expect(gltf.animations?.[0]?.channels?.length).toBeGreaterThan(0);
+
   await page.locator(".v2-export summary").click();
   const [partsDownload] = await Promise.all([
     page.waitForEvent("download"),
@@ -117,6 +125,43 @@ test("scene export produces a valid GLB and a per-part STL archive", async ({ pa
     ]),
   );
   expect(archive["assembly.stl"].byteLength).toBeGreaterThan(84);
+
+  expect(pageErrors).toEqual([]);
+});
+
+test("material controls switch between source colours and an instance override", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/studio");
+  await expect(page.locator(".v2-tree")).toBeVisible({ timeout: 60_000 });
+  await page.locator("summary").filter({ hasText: "Benchbook" }).click();
+  await page.locator("button.chip").filter({ hasText: /^Mounting plate$/ }).click();
+  await expect
+    .poll(
+      async () => {
+        const statuses = await page.locator(".v2-status").allTextContents();
+        return statuses.length === 1 && statuses[0] === "ready";
+      },
+      { timeout: 60_000 },
+    )
+    .toBe(true);
+  await page.locator("summary").filter({ hasText: "Benchbook" }).click();
+
+  await page.locator(".v2-instance-row .v2-row-name").first().click();
+  await expect(page.locator(".v2-inspector")).toContainText("Material");
+
+  const override = page.locator(".v2-material-mode button").filter({ hasText: "Override" });
+  const source = page.locator(".v2-material-mode button").filter({ hasText: "Source" });
+  const colour = page.locator(".v2-color");
+
+  await override.click();
+  await expect(override).toHaveClass(/active/);
+  await expect(colour).toBeEnabled();
+
+  await source.click();
+  await expect(source).toHaveClass(/active/);
+  await expect(colour).toBeDisabled();
 
   expect(pageErrors).toEqual([]);
 });

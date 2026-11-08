@@ -162,6 +162,7 @@ export function PartTree() {
   const loadRotaryStudy = useStudioV2((state) => state.loadRotaryStudy);
   const loadHumanoidStudy = useStudioV2((state) => state.loadHumanoidStudy);
   const loadWindTurbineStudy = useStudioV2((state) => state.loadWindTurbineStudy);
+  const loadLighthouseStudy = useStudioV2((state) => state.loadLighthouseStudy);
   const newPart = useStudioV2((state) => state.newPart);
   const importScad = useStudioV2((state) => state.importScad);
   const importDocument = useStudioV2((state) => state.importDocument);
@@ -228,7 +229,7 @@ export function PartTree() {
             <details className="v2-labs">
               <summary className="v2-menu-item">
                 <span>Concept labs</span>
-                <span className="mono">4</span>
+                <span className="mono">5</span>
               </summary>
               <button
                 className="v2-menu-item"
@@ -276,6 +277,18 @@ export function PartTree() {
                 }}
               >
                 <span>Wind turbine</span>
+                <span className="mono">load</span>
+              </button>
+              <button
+                className="v2-menu-item"
+                onClick={(event) => {
+                  loadLighthouseStudy();
+                  const details = event.currentTarget.closest("details");
+                  if (details) details.open = false;
+                  event.currentTarget.closest(".v2-benchbook")?.removeAttribute("open");
+                }}
+              >
+                <span>Lighthouse scene</span>
                 <span className="mono">load</span>
               </button>
             </details>

@@ -14,6 +14,7 @@ import type { CadDocument, MaterialMode, MaterialRef, Transform } from "../docum
 import type { CompiledVariant } from "../compile/types";
 import { safeFileName } from "./bundle";
 import { assemblyStl, instanceStl, placedVariants } from "./geometry";
+import { buildSceneAnimations, type SceneAnimationOptions } from "./animation";
 
 function applyLocalTransform(object: Object3D, transform: Transform): void {
   object.position.set(transform.position[0], transform.position[1], transform.position[2]);
@@ -138,19 +139,33 @@ export function buildPartStlBundle(
   return zipSync(files, { level: 6 });
 }
 
+function uniqueName(used: Set<string>, base: string): string {
+  const trimmed = base.trim() || "Object";
+  let name = trimmed;
+  let index = 2;
+  while (used.has(name)) {
+    name = `${trimmed} ${index}`;
+    index += 1;
+  }
+  used.add(name);
+  return name;
+}
+
 export function buildSceneGroup(
   document: CadDocument,
   variants: Record<string, CompiledVariant>,
   instanceVariants: Record<string, CompiledVariant> = {},
 ): Group {
+  const usedNames = new Set<string>();
   const root = new Group();
-  root.name = document.name;
+  root.name = uniqueName(usedNames, document.name);
 
   const groupObjects = new Map<string, Group>();
   for (const group of document.groups) {
     const object = new Group();
-    object.name = group.name;
+    object.name = uniqueName(usedNames, group.name);
     object.visible = group.visible;
+    object.userData.cadgoId = group.id;
     applyLocalTransform(object, group.transform);
     groupObjects.set(group.id, object);
   }
@@ -166,7 +181,8 @@ export function buildSceneGroup(
       variantGeometry(item.variant),
       variantMaterial(item.materialMode ?? "source", item.material),
     );
-    mesh.name = item.instance.name;
+    mesh.name = uniqueName(usedNames, item.instance.name);
+    mesh.userData.cadgoId = item.instance.id;
     applyLocalTransform(mesh, item.instance.transform);
     const parent = item.instance.parentId ? groupObjects.get(item.instance.parentId) : undefined;
     (parent ?? root).add(mesh);
@@ -175,19 +191,34 @@ export function buildSceneGroup(
   return root;
 }
 
+export type SceneGlbOptions = SceneAnimationOptions & {
+  animations?: boolean;
+};
+
+export type SceneGlbResult = {
+  buffer: ArrayBuffer;
+  animationCount: number;
+};
+
 export async function buildSceneGlb(
   document: CadDocument,
   variants: Record<string, CompiledVariant>,
   instanceVariants: Record<string, CompiledVariant> = {},
-): Promise<ArrayBuffer> {
+  options: SceneGlbOptions = {},
+): Promise<SceneGlbResult> {
   const root = buildSceneGroup(document, variants, instanceVariants);
   try {
+    const animations = options.animations === false ? [] : buildSceneAnimations(document, root, options);
     const exporter = new GLTFExporter();
-    const result = await exporter.parseAsync(root, { binary: true, onlyVisible: true });
+    const result = await exporter.parseAsync(root, {
+      binary: true,
+      onlyVisible: true,
+      animations,
+    });
     if (!(result instanceof ArrayBuffer)) {
       throw new Error("Scene GLB export did not produce a binary buffer.");
     }
-    return result;
+    return { buffer: result, animationCount: animations.length };
   } finally {
     disposeScene(root);
   }

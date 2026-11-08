@@ -20,9 +20,9 @@ CAD is still expert software, and most AI 3D tools stop at a mesh. Cadgo gives h
 - CAD workspace: orthographic stage, standard views, axis gizmo, overall dimension lines, assembly tree, 3D selection, translate/rotate gizmo, isolate, group transforms and a per-part inspector.
 - Per-instance parameter overrides compiled as separate variants.
 - Image reference (up to three views) and optional print setup (purpose, printer, bed, material, supports); the print profile gates STL export on bed overflow.
-- Expression-driven motion as working logic for mechanisms and scenes: revolute, prismatic and link joints, including group joints so a complete rotor/fan subassembly spins intact; crank-angle and rotor-angle drivers; concept labs for a driven wind turbine, a V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle.
+- Expression-driven motion as working logic for mechanisms and scenes: revolute, prismatic and link joints, including group joints so a complete rotor/fan subassembly spins intact; crank-angle and rotor-angle drivers; concept labs for a driven wind turbine, a lighthouse scene, a V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle.
 - Inspection sheets rendered from the assembled scene and returned to the agent as vision evidence.
-- Exports: assembly STL, Scene GLB with the group hierarchy and resolved materials, a Part STLs ZIP with one transformed STL per visible instance plus the merged assembly, a ZIP with one editable SCAD per definition plus the assembly manifest and native document, plus `.cadgo.json`. Import `.scad` or `.cadgo.json`.
+- Exports: assembly STL, Scene GLB with the group hierarchy, resolved materials and driver animation clips, a Part STLs ZIP with one transformed STL per visible instance plus the merged assembly, a ZIP with one editable SCAD per definition plus the assembly manifest and native document, plus `.cadgo.json`. Import `.scad` or `.cadgo.json`.
 - Compressed share links, with an optional Blob/local service for assemblies above the URL limit.
 - All benchbook studies pass the parametric audit; the unit/integration suite plus Playwright smoke, export and visual snapshot coverage verify the document, compile, motion, GLB, per-part STL and scene paths.
 
@@ -50,7 +50,7 @@ The core journey fits on one screen: describe a part or scene, watch the agent b
 - SHA-256 variant cache, LRU memory cap, progressive compile and last-good meshes.
 - Expression-driven joints using a restricted expression parser; no server geometry and no recompile for motion.
 - Definition materials with explicit per-instance overrides; an override never mutates the shared definition.
-- Scene GLB export with the group hierarchy and resolved materials; the GLB is static, and joint/driver motion is not baked into animation clips.
+- Scene GLB export with the group hierarchy, resolved materials and one animation clip per driver; a scene with no drivers exports static.
 - Orthographic CAD stage with view gizmo, dimension annotations and transparent materials.
 - Parametric audit extended to top-level geometry calls and external includes.
 - Server-only API key, per-session and per-IP rate limits with an optional durable Redis (Upstash or Vercel KV) store, no account, local documents. Optional large-share storage through Vercel Blob or a local `.data/shares` directory.

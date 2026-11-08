@@ -267,12 +267,16 @@ export function StudioV2App() {
       return;
     }
     try {
-      const glb = await buildSceneGlb(document, variants, instanceVariants);
+      const result = await buildSceneGlb(document, variants, instanceVariants);
       downloadBlob(
-        new Blob([glb], { type: "model/gltf-binary" }),
+        new Blob([result.buffer], { type: "model/gltf-binary" }),
         `${safeName(document.name)}.glb`,
       );
-      setNotice("Scene GLB downloaded · millimetres.");
+      setNotice(
+        result.animationCount
+          ? `Scene GLB downloaded · ${result.animationCount} driver animation${result.animationCount === 1 ? "" : "s"} included.`
+          : "Scene GLB downloaded · static scene (no drivers).",
+      );
     } catch (error) {
       console.error("Cadgo scene GLB export failed", error);
       setNotice(error instanceof Error ? error.message : "Scene GLB export failed.");

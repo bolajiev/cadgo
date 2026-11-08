@@ -13,6 +13,12 @@ export type MotionWorldResult = {
   errors: Record<string, string>;
 };
 
+export type MotionLocalResult = {
+  groups: Map<string, Matrix4>;
+  instances: Map<string, Matrix4>;
+  errors: Record<string, string>;
+};
+
 export function driverValueMap(
   document: CadDocument,
   values: Record<string, number>,
@@ -73,6 +79,114 @@ function localJointMatrix(joint: Joint, vars: Record<string, number>): Matrix4 |
   return null;
 }
 
+function computeMotion(
+  document: CadDocument,
+  driverValues: Record<string, number>,
+): {
+  groupLocal: Map<string, Matrix4>;
+  groupWorld: Map<string, Matrix4>;
+  instanceLocal: Map<string, Matrix4>;
+  instanceWorld: Map<string, Matrix4>;
+  errors: Record<string, string>;
+} {
+  const drivers = driverValueMap(document, driverValues);
+  const errors: Record<string, string> = {};
+  const groupMotions = new Map<string, Matrix4>();
+
+  for (const joint of document.joints) {
+    if (!joint.enabled || joint.type === "link") continue;
+    if (!("childGroupId" in joint) || !joint.childGroupId) continue;
+    try {
+      const { vars } = jointVars(document, joint, driverValues, drivers);
+      const local = localJointMatrix(joint, vars);
+      if (!local) continue;
+      const current = groupMotions.get(joint.childGroupId) ?? new Matrix4();
+      groupMotions.set(joint.childGroupId, current.multiply(local));
+    } catch (error) {
+      errors[joint.id] = error instanceof Error ? error.message : "Joint expression failed.";
+    }
+  }
+
+  const groupLocal = new Map<string, Matrix4>();
+  for (const group of document.groups) {
+    const base = transformMatrix(group.transform);
+    const motion = groupMotions.get(group.id);
+    groupLocal.set(group.id, motion ? base.multiply(motion) : base);
+  }
+
+  const groupWorld = new Map<string, Matrix4>();
+  const resolveGroup = (groupId: string | null): Matrix4 => {
+    if (!groupId) return new Matrix4();
+    const cached = groupWorld.get(groupId);
+    if (cached) return cached.clone();
+    const group = document.groups.find((item) => item.id === groupId);
+    if (!group) return new Matrix4();
+    const base = resolveGroup(group.parentId).multiply(groupLocal.get(group.id) ?? transformMatrix(group.transform));
+    groupWorld.set(groupId, base);
+    return base.clone();
+  };
+  for (const group of document.groups) resolveGroup(group.id);
+
+  const instanceLocal = new Map<string, Matrix4>();
+  const instanceWorld = new Map<string, Matrix4>();
+  for (const instance of document.instances) {
+    instanceLocal.set(instance.id, transformMatrix(instance.transform));
+    instanceWorld.set(
+      instance.id,
+      resolveGroup(instance.parentId).multiply(transformMatrix(instance.transform)),
+    );
+  }
+
+  for (const joint of document.joints) {
+    if (!joint.enabled || joint.type === "link") continue;
+    if (!joint.childInstanceId) continue;
+    try {
+      const { vars } = jointVars(document, joint, driverValues, drivers);
+      const local = localJointMatrix(joint, vars);
+      if (!local) continue;
+      const currentLocal = instanceLocal.get(joint.childInstanceId) ?? new Matrix4();
+      const currentWorld = instanceWorld.get(joint.childInstanceId) ?? new Matrix4();
+      instanceLocal.set(joint.childInstanceId, currentLocal.multiply(local));
+      instanceWorld.set(joint.childInstanceId, currentWorld.multiply(local));
+    } catch (error) {
+      errors[joint.id] = error instanceof Error ? error.message : "Joint expression failed.";
+    }
+  }
+
+  for (const joint of document.joints) {
+    if (!joint.enabled || joint.type !== "link") continue;
+    try {
+      const parent = instanceWorld.get(joint.parentInstanceId);
+      const target = instanceWorld.get(joint.targetInstanceId);
+      const child = document.instances.find((instance) => instance.id === joint.childInstanceId);
+      if (!parent || !target || !child) throw new Error("Link joint references a missing instance.");
+      const parentPoint = new Vector3(...joint.parentPoint).applyMatrix4(parent);
+      const targetPoint = new Vector3(...joint.targetPoint).applyMatrix4(target);
+      const direction = targetPoint.clone().sub(parentPoint);
+      const distance = direction.length();
+      if (distance < 0.0001) throw new Error("Link joint endpoints are coincident.");
+      const quaternion = new Quaternion().setFromUnitVectors(
+        new Vector3(0, 0, 1),
+        direction.normalize(),
+      );
+      const childPoint = new Vector3(...joint.childPoint).applyQuaternion(quaternion);
+      const position = parentPoint.clone().sub(childPoint);
+      const definition = document.definitions.find((item) => item.id === child.definitionId);
+      const lengthParam = definition?.params.find((param) => param.name === "length")?.value;
+      const naturalLength = typeof lengthParam === "number" && lengthParam > 0 ? lengthParam : distance;
+      const scale = joint.stretch ? distance / naturalLength : 1;
+      const world = new Matrix4().compose(position, quaternion, new Vector3(1, 1, scale));
+      const parentWorld = resolveGroup(child.parentId);
+      instanceWorld.set(joint.childInstanceId, world);
+      instanceLocal.set(joint.childInstanceId, parentWorld.invert().multiply(world));
+    } catch (error) {
+      errors[joint.id] = error instanceof Error ? error.message : "Link joint failed.";
+    }
+  }
+
+  return { groupLocal, groupWorld, instanceLocal, instanceWorld, errors };
+}
+
 export function jointTransforms(
   document: CadDocument,
   driverValues: Record<string, number>,
@@ -102,88 +216,14 @@ export function motionWorldMatrices(
   document: CadDocument,
   driverValues: Record<string, number>,
 ): MotionWorldResult {
-  const matrices = new Map<string, Matrix4>();
-  const errors: Record<string, string> = {};
-  const drivers = driverValueMap(document, driverValues);
-  const groupMotions = new Map<string, Matrix4>();
+  const motion = computeMotion(document, driverValues);
+  return { matrices: motion.instanceWorld, errors: motion.errors };
+}
 
-  for (const joint of document.joints) {
-    if (!joint.enabled || joint.type === "link") continue;
-    if (!("childGroupId" in joint) || !joint.childGroupId) continue;
-    try {
-      const { vars } = jointVars(document, joint, driverValues, drivers);
-      const local = localJointMatrix(joint, vars);
-      if (!local) continue;
-      const current = groupMotions.get(joint.childGroupId) ?? new Matrix4();
-      groupMotions.set(joint.childGroupId, current.multiply(local));
-    } catch (error) {
-      errors[joint.id] = error instanceof Error ? error.message : "Joint expression failed.";
-    }
-  }
-
-  const groupWorld = new Map<string, Matrix4>();
-  const resolveGroup = (groupId: string | null): Matrix4 => {
-    if (!groupId) return new Matrix4();
-    const cached = groupWorld.get(groupId);
-    if (cached) return cached.clone();
-    const group = document.groups.find((item) => item.id === groupId);
-    if (!group) return new Matrix4();
-    const base = resolveGroup(group.parentId).multiply(transformMatrix(group.transform));
-    const motion = groupMotions.get(groupId);
-    const world = motion ? base.multiply(motion) : base;
-    groupWorld.set(groupId, world);
-    return world.clone();
-  };
-
-  for (const instance of document.instances) {
-    const base = resolveGroup(instance.parentId).multiply(transformMatrix(instance.transform));
-    matrices.set(instance.id, base);
-  }
-
-  for (const joint of document.joints) {
-    if (!joint.enabled || joint.type === "link") continue;
-    if (!joint.childInstanceId) continue;
-    try {
-      const { vars } = jointVars(document, joint, driverValues, drivers);
-      const local = localJointMatrix(joint, vars);
-      if (!local) continue;
-      const current = matrices.get(joint.childInstanceId) ?? new Matrix4();
-      matrices.set(joint.childInstanceId, current.multiply(local));
-    } catch (error) {
-      errors[joint.id] = error instanceof Error ? error.message : "Joint expression failed.";
-    }
-  }
-
-  for (const joint of document.joints) {
-    if (!joint.enabled || joint.type !== "link") continue;
-    try {
-      const parent = matrices.get(joint.parentInstanceId);
-      const target = matrices.get(joint.targetInstanceId);
-      const child = document.instances.find((instance) => instance.id === joint.childInstanceId);
-      if (!parent || !target || !child) throw new Error("Link joint references a missing instance.");
-      const parentPoint = new Vector3(...joint.parentPoint).applyMatrix4(parent);
-      const targetPoint = new Vector3(...joint.targetPoint).applyMatrix4(target);
-      const direction = targetPoint.clone().sub(parentPoint);
-      const distance = direction.length();
-      if (distance < 0.0001) throw new Error("Link joint endpoints are coincident.");
-      const quaternion = new Quaternion().setFromUnitVectors(
-        new Vector3(0, 0, 1),
-        direction.normalize(),
-      );
-      const childPoint = new Vector3(...joint.childPoint).applyQuaternion(quaternion);
-      const position = parentPoint.clone().sub(childPoint);
-      const definition = document.definitions.find((item) => item.id === child.definitionId);
-      const lengthParam = definition?.params.find((param) => param.name === "length")?.value;
-      const naturalLength = typeof lengthParam === "number" && lengthParam > 0 ? lengthParam : distance;
-      const scale = joint.stretch ? distance / naturalLength : 1;
-      matrices.set(
-        joint.childInstanceId,
-        new Matrix4().compose(position, quaternion, new Vector3(1, 1, scale)),
-      );
-    } catch (error) {
-      errors[joint.id] = error instanceof Error ? error.message : "Link joint failed.";
-    }
-  }
-
-  return { matrices, errors };
+export function motionLocalTransforms(
+  document: CadDocument,
+  driverValues: Record<string, number>,
+): MotionLocalResult {
+  const motion = computeMotion(document, driverValues);
+  return { groups: motion.groupLocal, instances: motion.instanceLocal, errors: motion.errors };
 }

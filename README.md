@@ -12,6 +12,8 @@ CAD-grade parametric editing stays the core: named dimensions, editable source, 
 
 ![Cadgo mounting plate in the assembly studio](docs/studio.png)
 
+![The lighthouse concept scene with a driven beacon](docs/lighthouse.png)
+
 ## What it does
 
 - **Prompt → parametric assembly.** The agent writes OpenSCAD, the browser compiles it locally, and the dimensions appear as editable parameters. The same graph holds mechanical parts and concept scenes.
@@ -27,8 +29,8 @@ CAD-grade parametric editing stays the core: named dimensions, editable source, 
 - **Image and print setup.** Attach up to three reference views; set purpose, printer, bed, material and supports. The print profile travels with the prompt and gates STL export on bed overflow.
 - **Inspection.** The agent requests orthographic views; the browser renders the assembly and returns it to the model as vision evidence.
 - **Motion.** Joints and drivers are the working logic for mechanisms and scenes: expression-driven revolute/prismatic/link joints, with a whole group as the joint target so a rotor or fan spins intact without separating its blades. Concept labs include a V8 and a transparent rotary mechanism.
-- **Export and import.** Exports are assembly STL, a Scene GLB with the group hierarchy and resolved materials, a Part STLs ZIP (one transformed STL per visible instance plus the merged assembly), a ZIP with one editable SCAD per definition plus the assembly manifest and native document, `.cadgo.json`, and compressed share links. Import `.scad` as a new part or `.cadgo.json` to restore a complete assembly.
-- **Benchbook.** A mounting plate, honeycomb angle bracket, knurled knob and spur gear, all fully parametric. Concept labs add a driven wind turbine, the V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle. A narration/shot script for the demo is in `DEMO_SCRIPT.md`.
+- **Export and import.** Exports are assembly STL, a Scene GLB with the group hierarchy, resolved materials and driver animation clips, a Part STLs ZIP (one transformed STL per visible instance plus the merged assembly), a ZIP with one editable SCAD per definition plus the assembly manifest and native document, `.cadgo.json`, and compressed share links. Import `.scad` as a new part or `.cadgo.json` to restore a complete assembly.
+- **Benchbook.** A mounting plate, honeycomb angle bracket, knurled knob and spur gear, all fully parametric. Concept labs add a driven wind turbine, a lighthouse scene, the V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle. A narration/shot script for the demo is in `DEMO_SCRIPT.md`.
 
 ![The assembly tree and property inspector](docs/studio-panel.png)
 
@@ -101,13 +103,13 @@ npm run build
 5. Attach reference views and open **Print setup**; the profile goes with the next agent message and gates STL export.
 6. Import a `.scad` as a new part, or import a previously exported `.cadgo.json`.
 7. Open **Export** for assembly STL, Scene GLB, Part STLs, the SCAD ZIP bundle, the Cadgo document or a share link.
-8. Optional: **Benchbook → Concept labs** for the wind turbine, V8 and transparent rotary mechanism.
+8. Optional: **Benchbook → Concept labs** for the wind turbine, lighthouse scene, V8 and transparent rotary mechanism.
 
 ## Limits
 
 - Concept CAD and concept 3D scenes, not certified engineering: no B-Rep, STEP, tolerances, mating constraints or manufacturing validation.
 - Concept scenes are for visualization and motion studies: no physics, gameplay, animation timeline or scene scripting.
-- The Scene GLB is a static scene with the group hierarchy and materials. Joint and driver motion is shown in the studio, not exported as baked animation clips.
+- The Scene GLB includes a clip per driver when drivers exist; it is a scene export, not a full animation timeline. A scene with no drivers exports static.
 - OpenSCAD is a mesh/CSG kernel; organic surfaces and tight fits are approximations.
 - The V8 and rotary studies are concept labs, not manufacturable engines.
 - Up to three reference views; no camera calibration, crop/rotate or photogrammetry.

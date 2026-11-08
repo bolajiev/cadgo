@@ -38,7 +38,7 @@ A default material with no explicit mode infers `source`; a custom material infe
 Geometry exports run entirely in the browser; the server never receives a mesh. The only server-side document path is the optional large-share store, which receives a compressed share payload, not geometry.
 
 - **Assembly STL** — each visible placed variant is transformed into world coordinates and written as a binary STL.
-- **Scene GLB** — the document group hierarchy is rebuilt as a three.js scene and exported with `GLTFExporter`; materials carry the resolved source/override mode. The GLB is static: joints and drivers are not baked into animation clips.
+- **Scene GLB** — the document group hierarchy is rebuilt as a three.js scene and exported with `GLTFExporter`; materials carry the resolved source/override mode. For each driver, `motionLocalTransforms` is sampled and the animated group/instance local transforms become a glTF animation clip. A document with no drivers exports a static scene.
 - **Part STLs ZIP** — `assembly.stl` plus one transformed STL per visible instance, a manifest and a README.
 - **SCAD ZIP** — one editable `.scad` per definition, plus `assembly.json` (parts, parameters, groups, instances, joints, drivers), `document.cadgo.json` and a README.
 - **Native JSON** — the full document for round-trip import.

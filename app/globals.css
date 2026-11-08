@@ -6360,6 +6360,76 @@ a {
   gap: 5px;
 }
 
+.v2-material-mode {
+  display: inline-flex;
+  border: 1px solid var(--line);
+}
+
+.v2-material-mode button {
+  padding: 3px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.v2-material-mode button.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.v2-material-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.v2-color {
+  width: 38px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--paper-deep);
+  cursor: pointer;
+}
+
+.v2-color:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.v2-material-hex {
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+}
+
+.v2-material-slider {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+  color: var(--ink-soft);
+  font-size: 9px;
+}
+
+.v2-material-slider input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.v2-material-slider .mono {
+  color: var(--muted);
+  font-size: 8px;
+  text-align: right;
+}
+
 .v2-param {
   margin-bottom: 13px;
 }
