@@ -267,6 +267,142 @@ color([0.82, 0.18, 0.10])
   }
 `;
 
+const cover = `// Project box cover
+// [Plate]
+length = 120; // [60:240]
+width = 80; // [40:180]
+thickness = 4; // [2:10]
+corner = 6; // [2:20]
+// [Lip]
+lip_height = 4; // [1:12]
+lip_thickness = 2; // [1:6]
+lip_clearance = 0.3; // [0.1:1.5]
+// [Screws]
+screw_diameter = 4.2; // [2:8]
+screw_inset = 10; // [4:30]
+screw_count_x = 2; // [2:4]
+screw_count_y = 2; // [2:4]
+$fn = 64;
+
+module rounded_box(l, w, h, r) {
+  hull() {
+    for (x = [-l / 2 + r, l / 2 - r])
+      for (y = [-w / 2 + r, w / 2 - r])
+        translate([x, y, 0]) cylinder(h = h, r = r);
+  }
+}
+
+module cover() {
+  difference() {
+    union() {
+      translate([0, 0, lip_height]) rounded_box(length, width, thickness, corner);
+      difference() {
+        rounded_box(length - lip_clearance * 2, width - lip_clearance * 2, lip_height, max(corner - lip_clearance, lip_thickness));
+        translate([0, 0, -1])
+          rounded_box(
+            length - lip_clearance * 2 - lip_thickness * 2,
+            width - lip_clearance * 2 - lip_thickness * 2,
+            lip_height + 2,
+            max(corner - lip_clearance - lip_thickness, lip_thickness)
+          );
+      }
+    }
+    for (i = [0 : screw_count_x - 1])
+      for (j = [0 : screw_count_y - 1]) {
+        x = -length / 2 + screw_inset + i * (length - screw_inset * 2) / (screw_count_x - 1);
+        y = -width / 2 + screw_inset + j * (width - screw_inset * 2) / (screw_count_y - 1);
+        translate([x, y, lip_height - 1]) cylinder(h = thickness + 2, d = screw_diameter);
+      }
+  }
+}
+color([0.82, 0.84, 0.86]) cover();`;
+
+const adapter = `// Stepped pipe adapter
+large_diameter = 34; // [18:80]
+small_diameter = 22; // [12:60]
+large_length = 24; // [10:80]
+small_length = 36; // [10:120]
+flange_diameter = 46; // [24:100]
+flange_thickness = 5; // [2:12]
+bore_large = 28; // [10:70]
+bore_small = 16; // [6:50]
+$fn = 64;
+
+module pipe_adapter() {
+  difference() {
+    union() {
+      cylinder(h = flange_thickness, d = flange_diameter);
+      translate([0, 0, flange_thickness])
+        cylinder(h = large_length, d = large_diameter);
+      translate([0, 0, flange_thickness + large_length])
+        cylinder(h = small_length, d1 = large_diameter, d2 = small_diameter);
+    }
+    translate([0, 0, -1])
+      cylinder(h = flange_thickness + large_length + 2, d = bore_large);
+    translate([0, 0, -1])
+      cylinder(h = flange_thickness + large_length + small_length + 2, d = bore_small);
+  }
+}
+color([0.62, 0.64, 0.66]) pipe_adapter();`;
+
+const foot = `// Replacement furniture foot
+top_diameter = 42; // [20:90]
+bottom_diameter = 34; // [16:80]
+height = 26; // [10:60]
+pad_diameter = 28; // [10:70]
+pad_depth = 2; // [1:8]
+pilot_diameter = 4; // [2:8]
+pilot_depth = 12; // [4:30]
+$fn = 64;
+
+module furniture_foot() {
+  difference() {
+    cylinder(h = height, d1 = bottom_diameter, d2 = top_diameter);
+    translate([0, 0, height - pilot_depth])
+      cylinder(h = pilot_depth + 1, d = pilot_diameter);
+    translate([0, 0, -1])
+      cylinder(h = pad_depth + 1, d = pad_diameter);
+  }
+}
+color([0.24, 0.22, 0.2]) furniture_foot();`;
+
+const clip = `// Screw-mounted desk cable clip
+cable_diameter = 8; // [3:20]
+wall = 3; // [1.5:6]
+clip_width = 12; // [6:30]
+gap = 4; // [1:10]
+base_length = 36; // [20:80]
+base_width = 18; // [10:40]
+base_thickness = 4; // [2:10]
+screw_diameter = 4; // [2:8]
+screw_inset = 6; // [3:15]
+ring_overlap = 2; // [1:4]
+$fn = 64;
+ring_radius = cable_diameter / 2 + wall;
+ring_x = -base_length / 2 + ring_radius + wall;
+ring_z = base_thickness + ring_radius - ring_overlap;
+
+module desk_cable_clip() {
+  difference() {
+    union() {
+      translate([-base_length / 2, -base_width / 2, 0])
+        cube([base_length, base_width, base_thickness]);
+      translate([ring_x, 0, ring_z])
+        rotate([90, 0, 0])
+          cylinder(h = clip_width, d = ring_radius * 2, center = true);
+    }
+    translate([ring_x, 0, ring_z])
+      rotate([90, 0, 0])
+        cylinder(h = clip_width + 2, d = cable_diameter, center = true);
+    translate([ring_x, 0, ring_z + (ring_radius + cable_diameter / 2 + 1) / 2])
+      cube([gap, clip_width + 2, ring_radius - cable_diameter / 2 + 1], center = true);
+    translate([base_length / 2 - screw_inset, 0, -1])
+      cylinder(h = base_thickness + 2, d = screw_diameter);
+  }
+}
+color([0.18, 0.2, 0.22]) desk_cable_clip();`;
+
+
 export const SCAD_EXAMPLES: ScadExample[] = [
   {
     id: "knob",
@@ -295,6 +431,34 @@ export const SCAD_EXAMPLES: ScadExample[] = [
     prompt:
       "A 24 tooth spur gear with module 2, 8 mm thick, a 6 mm shaft bore, five lightening holes and a raised hub",
     code: gear,
+  },
+  {
+    id: "cover",
+    title: "Project box cover",
+    prompt:
+      "A screw-down project box cover, 120 x 80 mm, with a locating lip, rounded corners and four M4 clearance holes",
+    code: cover,
+  },
+  {
+    id: "adapter",
+    title: "Pipe adapter",
+    prompt:
+      "A stepped pipe adapter with a 46 mm flange, a 34 mm large end, a 22 mm small end and a through bore",
+    code: adapter,
+  },
+  {
+    id: "foot",
+    title: "Furniture foot",
+    prompt:
+      "A replacement furniture foot with a tapered body, a blind screw pilot and a recessed felt pad seat",
+    code: foot,
+  },
+  {
+    id: "clip",
+    title: "Desk cable clip",
+    prompt:
+      "A screw-mounted desk cable clip for an 8 mm cable, with a C-ring, a snap-in slot and one mounting hole",
+    code: clip,
   },
 ];
 

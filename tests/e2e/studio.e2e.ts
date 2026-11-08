@@ -33,6 +33,11 @@ test("assembly studio loads the V8 and keeps editing live", async ({ page }) => 
     maxDiffPixelRatio: 0.04,
   });
 
+  await page.locator('[aria-label="Toggle presentation lighting"]').click();
+  await expect(page.locator(".v2-stage")).toHaveClass(/v2-stage--presentation/);
+  await page.locator('[aria-label="Toggle presentation lighting"]').click();
+  await expect(page.locator(".v2-stage")).not.toHaveClass(/v2-stage--presentation/);
+
   await page.locator(".v2-instance-row .v2-row-name").filter({ hasText: "Block" }).first().click();
   const px = page.locator(".v2-inspector .v2-field input").first();
   await expect(px).toHaveValue("0");
@@ -257,5 +262,33 @@ test("print check uses a real print profile and reports fit and watertightness",
   await expect(report).toContainText("Mounting plate");
   await expect(report).toContainText("fits");
   await expect(report).toContainText("Solid mass");
+  expect(pageErrors).toEqual([]);
+});
+
+test("starter library examples load as single watertight parts", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  const examples = ["Project box cover", "Pipe adapter", "Furniture foot", "Desk cable clip"];
+
+  await page.goto("/studio");
+  await expect(page.locator(".v2-tree")).toBeVisible({ timeout: 60_000 });
+
+  for (const title of examples) {
+    await page.locator("summary").filter({ hasText: "Benchbook" }).click();
+    await page.locator(".v2-benchbook .v2-menu-item").filter({ hasText: title }).click();
+    await expect
+      .poll(
+        async () => {
+          const statuses = await page.locator(".v2-status").allTextContents();
+          return statuses.length === 1 && statuses[0] === "ready";
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(true);
+    await page.locator(".v2-def-row .v2-row-name").filter({ hasText: title }).first().click();
+    await expect(page.locator(".v2-inspector .v2-metrics")).toContainText("Watertight");
+    await expect(page.locator(".v2-inspector .v2-metrics")).toContainText("Yes");
+  }
+
   expect(pageErrors).toEqual([]);
 });

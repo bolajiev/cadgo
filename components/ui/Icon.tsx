@@ -2,6 +2,13 @@ import type { SVGProps } from "react";
 
 const paths: Record<string, React.ReactNode> = {
   play: <path d="M4 2.8 12 8l-8 5.2z" fill="currentColor" stroke="none" />,
+  sun: (
+    <>
+      <circle cx="8" cy="8" r="2.8" />
+      <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M12.9 3.1l-1.4 1.4M4.5 11.5l-1.4 1.4" />
+    </>
+  ),
+  moon: <path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5Z" />,
   pause: (
     <>
       <path d="M5 3v10M11 3v10" />

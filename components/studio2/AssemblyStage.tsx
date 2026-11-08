@@ -183,6 +183,8 @@ function InstanceMesh({
     >
       <mesh
         geometry={geometry}
+        castShadow
+        receiveShadow
         onClick={(event) => {
           event.stopPropagation();
           selectInstance(item.instance.id);
@@ -261,7 +263,7 @@ function BoundsDimensions({
   );
 }
 
-function Scene({ view, fitKey, gizmoMode }: { view: View; fitKey: number; gizmoMode: "translate" | "rotate" }) {
+function Scene({ view, fitKey, gizmoMode, presentation }: { view: View; fitKey: number; gizmoMode: "translate" | "rotate"; presentation: boolean }) {
   const document = useStudioV2((state) => state.document);
   const variants = useStudioV2((state) => state.variants);
   const selectedInstanceId = useStudioV2((state) => state.selectedInstanceId);
@@ -347,16 +349,46 @@ function Scene({ view, fitKey, gizmoMode }: { view: View; fitKey: number; gizmoM
 
   return (
     <>
-      <color attach="background" args={["#08090c"]} />
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[radius * 2, -radius * 2.4, radius * 3]} intensity={2.1} />
-      <directionalLight position={[-radius * 1.8, radius, radius * 2]} intensity={0.55} />
-      <directionalLight position={[0, radius * 2.5, radius]} intensity={0.5} />
+      <color attach="background" args={[presentation ? "#e9e5db" : "#08090c"]} />
+      <ambientLight intensity={presentation ? 1.25 : 0.9} />
+      <directionalLight
+        castShadow={presentation}
+        position={[radius * 2, -radius * 2.4, radius * 3]}
+        intensity={presentation ? 2.5 : 2.1}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-left={-radius * 2}
+        shadow-camera-right={radius * 2}
+        shadow-camera-top={radius * 2}
+        shadow-camera-bottom={-radius * 2}
+        shadow-camera-near={0.1}
+        shadow-camera-far={radius * 10}
+      />
+      <directionalLight position={[-radius * 1.8, radius, radius * 2]} intensity={presentation ? 0.85 : 0.55} />
+      <directionalLight position={[0, radius * 2.5, radius]} intensity={presentation ? 0.55 : 0.5} />
       <gridHelper
-        args={[Math.max(240, radius * 12), 24, "#2b332b", "#1a201b"]}
+        args={[
+          Math.max(240, radius * 12),
+          24,
+          presentation ? "#c9c2b2" : "#2b332b",
+          presentation ? "#d9d2c3" : "#1a201b",
+        ]}
         rotation={[Math.PI / 2, 0, 0]}
         position={[0, 0, 0.01]}
       />
+      {presentation && bounds ? (
+        <mesh
+          receiveShadow
+          position={[
+            (bounds.min[0] + bounds.max[0]) / 2,
+            (bounds.min[1] + bounds.max[1]) / 2,
+            bounds.min[2] - 0.5,
+          ]}
+        >
+          <planeGeometry args={[radius * 8, radius * 8]} />
+          <shadowMaterial transparent opacity={0.18} />
+        </mesh>
+      ) : null}
       {placed.map((item) => {
         const geometry = geometries.get(item.variant.key);
         if (!geometry) return null;
@@ -373,9 +405,9 @@ function Scene({ view, fitKey, gizmoMode }: { view: View; fitKey: number; gizmoM
           />
         );
       })}
-      <BoundsDimensions bounds={bounds} />
+      {presentation ? null : <BoundsDimensions bounds={bounds} />}
       <GizmoHelper alignment="bottom-right" margin={[62, 62]}>
-        <GizmoViewport axisColors={["#d95b5b", "#5fbf7f", "#5b8fe0"]} labelColor="#e8e8e8" />
+        <GizmoViewport axisColors={["#d95b5b", "#5fbf7f", "#5b8fe0"]} labelColor={presentation ? "#1d1c19" : "#e8e8e8"} />
       </GizmoHelper>
       {selectedPlaced ? (
         <TransformControls
@@ -411,6 +443,7 @@ export function AssemblyStage() {
   const [view, setView] = useState<View>("iso");
   const [fitKey, setFitKey] = useState(0);
   const [gizmoMode, setGizmoMode] = useState<"translate" | "rotate">("translate");
+  const [presentation, setPresentation] = useState(false);
   const selectedInstanceId = useStudioV2((state) => state.selectedInstanceId);
   const isolatedInstanceId = useStudioV2((state) => state.isolatedInstanceId);
   const isolateInstance = useStudioV2((state) => state.isolateInstance);
@@ -428,16 +461,16 @@ export function AssemblyStage() {
   );
 
   return (
-    <section className="v2-stage">
+    <section className={`v2-stage ${presentation ? "v2-stage--presentation" : ""}`}>
       <Canvas
-        shadows={false}
+        shadows
         orthographic
         dpr={[1, 1.75]}
         gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
         camera={{ zoom: 1, near: 0.5, far: 20000, position: [200, -260, 180] }}
         onPointerMissed={() => selectInstance(null)}
       >
-        <Scene view={view} fitKey={fitKey} gizmoMode={gizmoMode} />
+        <Scene view={view} fitKey={fitKey} gizmoMode={gizmoMode} presentation={presentation} />
       </Canvas>
 
       <MotionHud />
@@ -482,6 +515,14 @@ export function AssemblyStage() {
           </button>
           <button className={`icon-btn ${view === "side" ? "active" : ""}`} onClick={() => setView("side")}>
             SD
+          </button>
+          <button
+            className={`icon-btn tooltip ${presentation ? "active" : ""}`}
+            data-tip={presentation ? "Dark drafting view" : "Presentation lighting"}
+            aria-label="Toggle presentation lighting"
+            onClick={() => setPresentation((value) => !value)}
+          >
+            <Icon name={presentation ? "moon" : "sun"} size={12} />
           </button>
           <button className="icon-btn tooltip" data-tip="Fit all" onClick={() => setFitKey((value) => value + 1)}>
             <Icon name="fit" />

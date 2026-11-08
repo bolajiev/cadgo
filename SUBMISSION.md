@@ -26,6 +26,7 @@ CAD is still expert software, and most AI 3D tools stop at a mesh. Cadgo gives h
 - Inspection sheets rendered from the assembled scene and returned to the agent as vision evidence.
 - Exports: assembly STL, Scene GLB with the group hierarchy, resolved materials, driver animation clips and options for samples, duration and static export, a Part STLs ZIP with one transformed STL per visible instance plus the merged assembly, a ZIP with one editable SCAD per definition plus the assembly manifest and native document, plus `.cadgo.json`. Import `.scad` or `.cadgo.json`.
 - Compressed share links, with an optional Blob/local service for assemblies above the URL limit.
+- Starter library: project box cover, pipe adapter, furniture foot and desk cable clip, all parametric and audit-clean.
 - All benchbook studies pass the parametric audit; the unit/integration suite plus Playwright smoke, export and visual snapshot coverage verify the document, compile, motion, GLB, per-part STL and scene paths.
 
 ## Generalizability
@@ -54,7 +55,7 @@ The core journey fits on one screen: describe a part or scene, watch the agent b
 - Definition materials with explicit per-instance overrides; an override never mutates the shared definition.
 - Scene GLB export with the group hierarchy, resolved materials and one animation clip per driver; a scene with no drivers exports static.
 - Print checks are based on real mesh metrics; wall thickness and slicer time are not measured, and mass assumes 100% infill.
-- Orthographic CAD stage with view gizmo, dimension annotations and transparent materials.
+- Orthographic CAD stage with view gizmo, dimension annotations, transparent materials and a presentation-lighting toggle with soft shadows.
 - Parametric audit extended to top-level geometry calls and external includes.
 - Server-only API key, per-session and per-IP rate limits with an optional durable Redis (Upstash or Vercel KV) store, no account, local documents. Optional large-share storage through Vercel Blob or a local `.data/shares` directory.
 

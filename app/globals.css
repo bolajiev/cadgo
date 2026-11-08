@@ -7562,3 +7562,20 @@ a {
     gap: 7px;
   }
 }
+
+.v2-stage--presentation {
+  background: #e9e5db;
+}
+
+.v2-stage--presentation .v2-stage-label {
+  color: #24231f;
+  text-shadow: none;
+}
+
+.v2-stage--presentation .v2-stage-label .mono {
+  color: #6b675f;
+}
+
+.v2-stage--presentation .view-controls {
+  background: rgba(255, 255, 255, 0.86);
+}
