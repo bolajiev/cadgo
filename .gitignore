@@ -40,3 +40,4 @@ __pycache__/
 
 # Local large-share storage
 /.data/
+.vercel

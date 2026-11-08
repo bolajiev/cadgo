@@ -6,7 +6,7 @@ Cadgo is a browser-based AI 3D assembly studio for mechanical assemblies and con
 
 CAD-grade parametric editing stays the core: named dimensions, editable source, separate bodies and standard exports.
 
-**Live demo:** https://omotalk.chat/studio  
+**Live demo:** https://cadgo-3d.vercel.app/studio  
 **Repository:** https://github.com/bolajiev/cadgo  
 **Hackathon:** Victoria VR AI Builder Hackathon 2026 · **AI-assisted 3D editing**
 
