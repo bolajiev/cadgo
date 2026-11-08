@@ -1,6 +1,6 @@
 import { Matrix4, Quaternion, Vector3 } from "three";
 import { evalExpr } from "../../cad/expr";
-import type { CadDocument, Joint } from "../document/types";
+import type { CadDocument, Driver, Joint } from "../document/types";
 import { transformMatrix } from "./geometry";
 
 export type MotionResult = {
@@ -226,4 +226,58 @@ export function motionLocalTransforms(
 ): MotionLocalResult {
   const motion = computeMotion(document, driverValues);
   return { groups: motion.groupLocal, instances: motion.instanceLocal, errors: motion.errors };
+}
+
+export type NodeMotion = {
+  joint: Joint;
+  driver: Driver;
+};
+
+function collectMotions(document: CadDocument, joints: Joint[]): NodeMotion[] {
+  const seen = new Set<string>();
+  const motions: NodeMotion[] = [];
+  for (const joint of joints) {
+    const driverId = "driverId" in joint ? joint.driverId : undefined;
+    if (!driverId || seen.has(joint.id)) continue;
+    const driver = document.drivers.find((item) => item.id === driverId);
+    if (!driver) continue;
+    seen.add(joint.id);
+    motions.push({ joint, driver });
+  }
+  return motions;
+}
+
+function ancestorGroupIds(document: CadDocument, groupId: string | null): Set<string> {
+  const ids = new Set<string>();
+  let cursor = groupId;
+  while (cursor && !ids.has(cursor)) {
+    ids.add(cursor);
+    const group = document.groups.find((item) => item.id === cursor);
+    cursor = group?.parentId ?? null;
+  }
+  return ids;
+}
+
+export function motionsForInstance(document: CadDocument, instanceId: string): NodeMotion[] {
+  const instance = document.instances.find((item) => item.id === instanceId);
+  if (!instance) return [];
+  const groupIds = ancestorGroupIds(document, instance.parentId);
+  const joints = document.joints.filter((joint) => {
+    if (!joint.enabled || joint.type === "link") return false;
+    if (joint.childInstanceId === instanceId) return true;
+    if (joint.parentInstanceId === instanceId) return true;
+    if ("childGroupId" in joint && joint.childGroupId && groupIds.has(joint.childGroupId)) return true;
+    return false;
+  });
+  return collectMotions(document, joints);
+}
+
+export function motionsForGroup(document: CadDocument, groupId: string): NodeMotion[] {
+  const groupIds = ancestorGroupIds(document, groupId);
+  const joints = document.joints.filter((joint) => {
+    if (!joint.enabled || joint.type === "link") return false;
+    if (!("childGroupId" in joint) || !joint.childGroupId) return false;
+    return groupIds.has(joint.childGroupId);
+  });
+  return collectMotions(document, joints);
 }

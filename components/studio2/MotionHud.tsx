@@ -33,6 +33,10 @@ export function MotionHud() {
   }, [document.drivers, selectedId]);
 
   useEffect(() => {
+    if (playing) setSelectedId(playing);
+  }, [playing]);
+
+  useEffect(() => {
     if (!playing) return;
     const driver = document.drivers.find((item) => item.id === playing);
     if (!driver) return;

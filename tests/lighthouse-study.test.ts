@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { auditParameterization } from "../lib/scad/audit";
 import { validateDocument } from "../lib/studio/document/validate";
-import { motionLocalTransforms, motionWorldMatrices } from "../lib/studio/v2/motion";
+import { motionLocalTransforms, motionWorldMatrices, motionsForGroup, motionsForInstance } from "../lib/studio/v2/motion";
 import { createLighthouseStudy } from "../lib/studio/v2/studies/lighthouse";
 
 describe("lighthouse scene study", () => {
@@ -25,6 +25,16 @@ describe("lighthouse scene study", () => {
       expect(audit.ok, `${definition.name}: ${audit.message}`).toBe(true);
       expect(definition.materialMode).toBe("override");
     }
+  });
+
+  it("exposes the beacon driver from the beacon, lamp room and beacon group", () => {
+    const document = createLighthouseStudy();
+    const expected = [["joint-beacon", "driver-beacon"]];
+    for (const instanceId of ["inst-beacon", "inst-lamp"]) {
+      expect(motionsForInstance(document, instanceId).map((motion) => [motion.joint.id, motion.driver.id])).toEqual(expected);
+    }
+    expect(motionsForInstance(document, "inst-tower")).toEqual([]);
+    expect(motionsForGroup(document, "group-beacon").map((motion) => [motion.joint.id, motion.driver.id])).toEqual(expected);
   });
 
   it("turns the beacon group while the tower and lamp room stay fixed", () => {

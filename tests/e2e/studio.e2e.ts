@@ -165,3 +165,32 @@ test("material controls switch between source colours and an instance override",
 
   expect(pageErrors).toEqual([]);
 });
+
+test("contextual motion plays the selected group's driver", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/studio");
+  await expect(page.locator(".v2-tree")).toBeVisible({ timeout: 60_000 });
+  await page.locator("summary").filter({ hasText: "Benchbook" }).click();
+  await page.locator(".v2-labs summary").click();
+  await page.locator(".v2-labs button").filter({ hasText: "Lighthouse scene" }).click();
+
+  await expect
+    .poll(
+      async () => {
+        const statuses = await page.locator(".v2-status").allTextContents();
+        return statuses.length === 5 && statuses.every((status) => status === "ready");
+      },
+      { timeout: 120_000 },
+    )
+    .toBe(true);
+
+  await page.locator(".v2-group-row .v2-row-name").filter({ hasText: "Beacon" }).first().click();
+  await expect(page.locator(".v2-inspector")).toContainText("Motion");
+  await page.locator('.v2-inspector button[aria-label="Play beacon_angle"]').click();
+  await expect(page.locator(".v2-motion-value")).not.toHaveText("0deg", { timeout: 10_000 });
+  await page.locator('.v2-inspector button[aria-label="Pause beacon_angle"]').click();
+
+  expect(pageErrors).toEqual([]);
+});

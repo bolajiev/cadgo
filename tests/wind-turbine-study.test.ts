@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { auditParameterization } from "../lib/scad/audit";
 import { validateDocument } from "../lib/studio/document/validate";
-import { motionLocalTransforms, motionWorldMatrices } from "../lib/studio/v2/motion";
+import { motionLocalTransforms, motionWorldMatrices, motionsForGroup, motionsForInstance } from "../lib/studio/v2/motion";
 import { createWindTurbineStudy } from "../lib/studio/v2/studies/windTurbine";
 
 describe("wind turbine study", () => {
@@ -61,6 +61,17 @@ describe("wind turbine study", () => {
     expect("childGroupId" in joint ? joint.childGroupId : undefined).toBe("group-rotor");
     expect("driverId" in joint ? joint.driverId : undefined).toBe("driver-rotor");
     expect("expression" in joint ? joint.expression : undefined).toBe("angle");
+  });
+
+  it("exposes the rotor driver for the rotor, nacelle and rotor group", () => {
+    const document = createWindTurbineStudy();
+    const expected = [["joint-rotor", "driver-rotor"]];
+    for (const instanceId of ["inst-rotor", "inst-nacelle"]) {
+      expect(motionsForInstance(document, instanceId).map((motion) => [motion.joint.id, motion.driver.id])).toEqual(expected);
+    }
+    expect(motionsForInstance(document, "inst-tower")).toEqual([]);
+    expect(motionsForGroup(document, "group-rotor").map((motion) => [motion.joint.id, motion.driver.id])).toEqual(expected);
+    expect(motionsForGroup(document, "group-missing")).toEqual([]);
   });
 
   it("provides local group transforms for GLB animation", () => {

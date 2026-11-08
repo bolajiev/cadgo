@@ -25,7 +25,7 @@ import {
   placedVariants,
   type PlacedVariant,
 } from "@/lib/studio/v2/geometry";
-import { motionWorldMatrices } from "@/lib/studio/v2/motion";
+import { motionsForInstance, motionWorldMatrices } from "@/lib/studio/v2/motion";
 import { inferMaterialMode } from "@/lib/studio/v2/material";
 
 type View = "iso" | "front" | "top" | "side";
@@ -158,6 +158,11 @@ function InstanceMesh({
   groupRef?: RefObject<Group | null>;
 }) {
   const selectInstance = useStudioV2((state) => state.selectInstance);
+  const document = useStudioV2((state) => state.document);
+  const playing = useStudioV2((state) => state.driverPlaying);
+  const setPlaying = useStudioV2((state) => state.setDriverPlaying);
+  const commitDriver = useStudioV2((state) => state.commitDriver);
+  const motions = useMemo(() => motionsForInstance(document, item.instance.id), [document, item.instance.id]);
   const materialMode = item.materialMode ?? inferMaterialMode(item.material);
   const override = materialMode === "override";
   const opacity = item.material?.opacity ?? 1;
@@ -181,6 +186,18 @@ function InstanceMesh({
         onClick={(event) => {
           event.stopPropagation();
           selectInstance(item.instance.id);
+        }}
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+          const motion = motions[0];
+          if (!motion) return;
+          if (playing === motion.driver.id) {
+            setPlaying(null);
+            commitDriver(motion.driver.id);
+            return;
+          }
+          if (playing) commitDriver(playing);
+          setPlaying(motion.driver.id);
         }}
       >
         <meshStandardMaterial

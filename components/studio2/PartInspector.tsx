@@ -13,6 +13,7 @@ import type {
   Transform,
 } from "@/lib/studio/document/types";
 import { inferMaterialMode } from "@/lib/studio/v2/material";
+import { motionsForGroup, motionsForInstance, type NodeMotion } from "@/lib/studio/v2/motion";
 import { useStudioV2 } from "@/lib/studio/v2/store";
 
 function NumberField({
@@ -296,6 +297,70 @@ function MaterialEditor({
   );
 }
 
+function MotionSection({ motions }: { motions: NodeMotion[] }) {
+  const values = useStudioV2((state) => state.driverValues);
+  const playing = useStudioV2((state) => state.driverPlaying);
+  const setValue = useStudioV2((state) => state.setDriverValue);
+  const setPlaying = useStudioV2((state) => state.setDriverPlaying);
+  const commit = useStudioV2((state) => state.commitDriver);
+  if (!motions.length) return null;
+
+  const drivers = new Map<string, { driver: NodeMotion["driver"]; joints: string[] }>();
+  for (const motion of motions) {
+    const entry = drivers.get(motion.driver.id) ?? { driver: motion.driver, joints: [] };
+    entry.joints.push(motion.joint.name);
+    drivers.set(motion.driver.id, entry);
+  }
+
+  const toggle = (driverId: string) => {
+    if (playing === driverId) {
+      setPlaying(null);
+      commit(driverId);
+      return;
+    }
+    if (playing) commit(playing);
+    setPlaying(driverId);
+  };
+
+  return (
+    <div className="v2-section">
+      <span className="v2-section-label mono">Motion</span>
+      {[...drivers.values()].map(({ driver, joints }) => {
+        const value = values[driver.id] ?? driver.value;
+        const isPlaying = playing === driver.id;
+        return (
+          <div className="v2-motion-link" key={driver.id}>
+            <div className="v2-motion-link-head">
+              <button
+                className="icon-btn"
+                type="button"
+                aria-label={isPlaying ? `Pause ${driver.name}` : `Play ${driver.name}`}
+                onClick={() => toggle(driver.id)}
+              >
+                <Icon name={isPlaying ? "pause" : "play"} />
+              </button>
+              <span className="v2-motion-joints">{joints.join(" · ")}</span>
+              <span className="mono">{driver.name}</span>
+            </div>
+            <input
+              className="v2-slider"
+              type="range"
+              min={driver.min}
+              max={driver.max}
+              step={driver.step}
+              value={value}
+              onChange={(event) => setValue(driver.id, Number(event.target.value))}
+              onPointerUp={() => commit(driver.id)}
+              onKeyUp={() => commit(driver.id)}
+            />
+          </div>
+        );
+      })}
+      <p className="v2-motion-hint">Double-click a moving part in the stage to play it.</p>
+    </div>
+  );
+}
+
 function ParamRow({ definition, param }: { definition: PartDefinition; param: ParameterDef }) {
   const setParam = useStudioV2((state) => state.setParam);
   const [value, setValue] = useState<number | boolean>(param.value);
@@ -561,6 +626,7 @@ function InstancePanel({ instance }: { instance: PartInstance }) {
   const instanceStates = useStudioV2((state) => state.instanceStates);
   const definition = document.definitions.find((item) => item.id === instance.definitionId);
   const variantState = instanceStates[instance.id];
+  const motions = useMemo(() => motionsForInstance(document, instance.id), [document, instance.id]);
   const patch = (patch: Partial<Pick<PartInstance, "visible" | "locked" | "suppressed">>) => {
     const current =
       useStudioV2.getState().document.instances.find((item) => item.id === instance.id) ?? instance;
@@ -609,6 +675,8 @@ function InstancePanel({ instance }: { instance: PartInstance }) {
           Suppressed
         </label>
       </div>
+
+      <MotionSection motions={motions} />
 
       {definition ? <MaterialEditor definition={definition} instance={instance} /> : null}
 
@@ -674,6 +742,7 @@ function GroupPanel({ group }: { group: GroupNode }) {
   const run = useStudioV2((state) => state.run);
   const childGroups = document.groups.filter((item) => item.parentId === group.id);
   const childInstances = document.instances.filter((item) => item.parentId === group.id);
+  const motions = useMemo(() => motionsForGroup(document, group.id), [document, group.id]);
 
   const patch = (patch: Partial<Pick<GroupNode, "visible" | "locked">>) => {
     const current = useStudioV2.getState().document.groups.find((item) => item.id === group.id) ?? group;
@@ -753,6 +822,8 @@ function GroupPanel({ group }: { group: GroupNode }) {
           Locked
         </label>
       </div>
+
+      <MotionSection motions={motions} />
     </>
   );
 }

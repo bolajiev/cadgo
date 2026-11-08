@@ -6430,6 +6430,39 @@ a {
   text-align: right;
 }
 
+.v2-motion-link {
+  margin-bottom: 10px;
+}
+
+.v2-motion-link-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 10px;
+}
+
+.v2-motion-link-head .mono {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 7px;
+}
+
+.v2-motion-joints {
+  color: var(--ink-soft);
+}
+
+.v2-motion-link .v2-slider {
+  width: 100%;
+}
+
+.v2-motion-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
 .v2-param {
   margin-bottom: 13px;
 }
