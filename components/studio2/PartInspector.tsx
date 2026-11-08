@@ -525,6 +525,7 @@ function DefinitionPanel({ definition }: { definition: PartDefinition }) {
   const applySource = useStudioV2((state) => state.applySource);
   const addInstance = useStudioV2((state) => state.addInstance);
   const deleteSelected = useStudioV2((state) => state.deleteSelected);
+  const setPrintCheckOpen = useStudioV2((state) => state.setPrintCheckOpen);
   const state = compileStates[definition.id];
   const variant = variants[definition.id];
   const instances = document.instances.filter((instance) => instance.definitionId === definition.id);
@@ -609,6 +610,9 @@ function DefinitionPanel({ definition }: { definition: PartDefinition }) {
         <button className="btn v2-small" onClick={() => addInstance(definition.id)}>
           <Icon name="plus" size={11} /> Add instance
         </button>
+        <button className="btn v2-small" onClick={() => setPrintCheckOpen(true)}>
+          Print check
+        </button>
         <button className="btn v2-small v2-danger" onClick={deleteSelected} disabled={instances.length > 0}>
           Delete part
         </button>
@@ -623,6 +627,7 @@ function InstancePanel({ instance }: { instance: PartInstance }) {
   const deleteSelected = useStudioV2((state) => state.deleteSelected);
   const selectDefinition = useStudioV2((state) => state.selectDefinition);
   const isolateInstance = useStudioV2((state) => state.isolateInstance);
+  const setPrintCheckOpen = useStudioV2((state) => state.setPrintCheckOpen);
   const instanceStates = useStudioV2((state) => state.instanceStates);
   const definition = document.definitions.find((item) => item.id === instance.definitionId);
   const variantState = instanceStates[instance.id];
@@ -729,6 +734,9 @@ function InstancePanel({ instance }: { instance: PartInstance }) {
         <button className="btn v2-small" onClick={() => isolateInstance(instance.id)}>
           Isolate
         </button>
+        <button className="btn v2-small" onClick={() => setPrintCheckOpen(true)}>
+          Print check
+        </button>
         <button className="btn v2-small v2-danger" onClick={deleteSelected} disabled={instance.locked}>
           Delete instance
         </button>
@@ -743,6 +751,7 @@ function GroupPanel({ group }: { group: GroupNode }) {
   const childGroups = document.groups.filter((item) => item.parentId === group.id);
   const childInstances = document.instances.filter((item) => item.parentId === group.id);
   const motions = useMemo(() => motionsForGroup(document, group.id), [document, group.id]);
+  const setPrintCheckOpen = useStudioV2((state) => state.setPrintCheckOpen);
 
   const patch = (patch: Partial<Pick<GroupNode, "visible" | "locked">>) => {
     const current = useStudioV2.getState().document.groups.find((item) => item.id === group.id) ?? group;
@@ -824,6 +833,12 @@ function GroupPanel({ group }: { group: GroupNode }) {
       </div>
 
       <MotionSection motions={motions} />
+
+      <div className="v2-actions">
+        <button className="btn v2-small" onClick={() => setPrintCheckOpen(true)}>
+          Print check
+        </button>
+      </div>
     </>
   );
 }

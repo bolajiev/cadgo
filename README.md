@@ -30,6 +30,7 @@ CAD-grade parametric editing stays the core: named dimensions, editable source, 
 - **Image and print setup.** Attach up to three reference views; set purpose, printer, bed, material and supports. The print profile travels with the prompt and gates STL export on bed overflow.
 - **Inspection.** The agent requests orthographic views; the browser renders the assembly and returns it to the model as vision evidence.
 - **Motion.** Joints and drivers are the working logic for mechanisms and scenes: expression-driven revolute/prismatic/link joints, with a whole group as the joint target so a rotor or fan spins intact without separating its blades. Select a part or group and play its driver in the inspector, or double-click a moving part in the stage. Concept labs include a V8 and a transparent rotary mechanism.
+- **Print check.** Real compiled-mesh checks: watertightness, overhang percentage against a configurable limit, bed fit, solid volume and a material-density mass estimate. The same report gates STL export. Wall thickness and slicer time are not measured.
 - **Export and import.** Exports are assembly STL, a Scene GLB with the group hierarchy, resolved materials, driver animation clips and options for samples, duration and static export, a Part STLs ZIP (one transformed STL per visible instance plus the merged assembly), a ZIP with one editable SCAD per definition plus the assembly manifest and native document, `.cadgo.json`, and compressed share links. Import `.scad` as a new part or `.cadgo.json` to restore a complete assembly.
 - **Benchbook.** A mounting plate, honeycomb angle bracket, knurled knob and spur gear, all fully parametric. Concept labs add a driven wind turbine, a lighthouse scene, the V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle. A narration/shot script for the demo is in `DEMO_SCRIPT.md`.
 
@@ -115,6 +116,7 @@ npm run build
 - The V8 and rotary studies are concept labs, not manufacturable engines.
 - Up to three reference views; no camera calibration, crop/rotate or photogrammetry.
 - No account or cloud project database. Documents autosave locally; an optional Blob/local store backs large share links.
+- Print check does not measure wall thickness or slicer time; those require a slicer or a B-Rep kernel. Mass assumes 100% infill.
 
 ## Judging alignment
 

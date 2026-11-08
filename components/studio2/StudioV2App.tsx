@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { useStudioV2 } from "@/lib/studio/v2/store";
-import { assemblyBounds, assemblyStl, groupVisible, placedVariants } from "@/lib/studio/v2/geometry";
+import { assemblyStl, groupVisible, placedVariants } from "@/lib/studio/v2/geometry";
 import { buildPartStlBundle, buildSceneGlb, type SceneGlbOptions } from "@/lib/studio/v2/export";
+import { buildPrintCheck } from "@/lib/studio/v2/print-check";
 import { buildScadBundle } from "@/lib/studio/v2/bundle";
 import { encodeDocumentShare, serializeDocument } from "@/lib/studio/document/serialize";
 import { formatNumber } from "@/lib/format";
@@ -13,6 +14,8 @@ import { PartTree } from "./PartTree";
 import { AgentPanel } from "./AgentPanel";
 import { AssemblyStage } from "./AssemblyStage";
 import { PartInspector } from "./PartInspector";
+import { PrintCheckDialog } from "./PrintCheckDialog";
+import { PrintSetup } from "@/components/studio/PrintSetup";
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -38,6 +41,7 @@ function ExportMenu({
   onGlb,
   onGlbOptions,
   onParts,
+  onPrintCheck,
   onScad,
   onJson,
   onShare,
@@ -46,6 +50,7 @@ function ExportMenu({
   onGlb: () => void;
   onGlbOptions: () => void;
   onParts: () => void;
+  onPrintCheck: () => void;
   onScad: () => void;
   onJson: () => void;
   onShare: () => void;
@@ -68,6 +73,9 @@ function ExportMenu({
         </button>
         <button className="menu-item" onClick={(event) => { onParts(); closeMenu(event); }}>
           <span>Part STLs</span><span className="mono">.zip</span>
+        </button>
+        <button className="menu-item" onClick={(event) => { onPrintCheck(); closeMenu(event); }}>
+          <span>Print check</span><span className="mono">report</span>
         </button>
         <button className="menu-item" onClick={(event) => { onScad(); closeMenu(event); }}>
           <span>SCAD bundle</span><span className="mono">.zip</span>
@@ -99,6 +107,12 @@ export function StudioV2App() {
   const compileStates = useStudioV2((state) => state.compileStates);
   const instanceStates = useStudioV2((state) => state.instanceStates);
   const printProfile = useStudioV2((state) => state.printProfile);
+  const setPrintProfile = useStudioV2((state) => state.setPrintProfile);
+  const printSetupOpen = useStudioV2((state) => state.printSetupOpen);
+  const setPrintSetupOpen = useStudioV2((state) => state.setPrintSetupOpen);
+  const printCheckOpen = useStudioV2((state) => state.printCheckOpen);
+  const setPrintCheckOpen = useStudioV2((state) => state.setPrintCheckOpen);
+  const referenceImages = useStudioV2((state) => state.referenceImages);
   const agentStatus = useStudioV2((state) => state.agentStatus);
   const pendingQuestion = useStudioV2((state) => state.pendingQuestion);
   const [title, setTitleDraft] = useState(document.name);
@@ -228,34 +242,14 @@ export function StudioV2App() {
     return issues;
   }, [compileStates, document.instances, instanceStates, instanceVariants, variants]);
 
-  const printIssues = useMemo(() => {
-    const issues = [...compileIssues];
-    for (const instance of document.instances) {
-      if (!instance.visible || instance.suppressed) continue;
-      if (!groupVisible(document, instance.parentId)) continue;
-      const variant = instanceVariants[instance.id] ?? variants[instance.definitionId];
-      if (!variant) continue;
-      if (variant.metrics.boundaryEdges > 0 || variant.metrics.nonManifoldEdges > 0) {
-        issues.push(`${instance.name} is not watertight`);
-      }
-    }
-    if (printProfile?.purpose === "3d-print" && printProfile.bed) {
-      const bounds = assemblyBounds(document, variants, instanceVariants);
-      if (bounds) {
-        const dims = [
-          bounds.max[0] - bounds.min[0],
-          bounds.max[1] - bounds.min[1],
-          bounds.max[2] - bounds.min[2],
-        ];
-        const axes = ["X", "Y", "Z"];
-        dims.forEach((dim, index) => {
-          const limit = printProfile.bed ? [printProfile.bed.x, printProfile.bed.y, printProfile.bed.z][index] : 0;
-          if (dim > limit) issues.push(`Assembly exceeds the ${axes[index]} bed by ${(dim - limit).toFixed(1)} mm`);
-        });
-      }
-    }
-    return issues;
-  }, [compileIssues, document, instanceVariants, printProfile, variants]);
+  const printReport = useMemo(
+    () => buildPrintCheck(document, variants, instanceVariants, printProfile),
+    [document, instanceVariants, printProfile, variants],
+  );
+  const printIssues = useMemo(
+    () => [...compileIssues, ...printReport.errors],
+    [compileIssues, printReport.errors],
+  );
 
   const downloadStl = () => {
     if (printIssues.length) {
@@ -440,6 +434,7 @@ export function StudioV2App() {
             onGlb={downloadGlb}
             onGlbOptions={() => setGlbOptionsOpen(true)}
             onParts={downloadPartStls}
+            onPrintCheck={() => setPrintCheckOpen(true)}
             onScad={downloadScad}
             onJson={downloadDocument}
             onShare={() => void share()}
@@ -562,6 +557,40 @@ export function StudioV2App() {
             {compileIssues.length ? <p className="v2-audit-warn">{compileIssues.slice(0, 2).join("; ")}</p> : null}
           </div>
         </Modal>
+      ) : null}
+
+      {printCheckOpen ? (
+        <PrintCheckDialog
+          report={printReport}
+          compileIssues={compileIssues}
+          onClose={() => setPrintCheckOpen(false)}
+          onEditSetup={() => {
+            setPrintCheckOpen(false);
+            setPrintSetupOpen(true);
+          }}
+        />
+      ) : null}
+
+      {printSetupOpen ? (
+        <div
+          className="v2-setup-overlay"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) setPrintSetupOpen(false);
+          }}
+        >
+          <div className="v2-setup-card">
+            <PrintSetup
+              initial={printProfile}
+              hasImage={referenceImages.length > 0}
+              onSave={(profile) => {
+                setPrintProfile(profile);
+                setPrintSetupOpen(false);
+                setNotice("Print / process setup saved.");
+              }}
+              onCancel={() => setPrintSetupOpen(false)}
+            />
+          </div>
+        </div>
       ) : null}
 
       {notice ? (

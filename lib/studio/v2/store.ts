@@ -63,10 +63,14 @@ type StudioV2State = {
   driverSpeed: number;
   referenceImages: StudioImage[];
   printProfile: PrintProfile | null;
+  printSetupOpen: boolean;
+  printCheckOpen: boolean;
   addReferenceImage: (image: StudioImage) => boolean;
   removeReferenceImage: (index: number) => void;
   clearReferenceImages: () => void;
   setPrintProfile: (profile: PrintProfile | null) => void;
+  setPrintSetupOpen: (open: boolean) => void;
+  setPrintCheckOpen: (open: boolean) => void;
   setDriverValue: (driverId: string, value: number) => void;
   setDriverPlaying: (driverId: string | null) => void;
   setDriverSpeed: (speed: number) => void;
@@ -163,6 +167,8 @@ export const useStudioV2 = create<StudioV2State>((set, get) => ({
   driverSpeed: 90,
   referenceImages: [],
   printProfile: null,
+  printSetupOpen: false,
+  printCheckOpen: false,
   addReferenceImage: (image) => {
     const current = get().referenceImages;
     if (current.length >= 3) {
@@ -181,6 +187,8 @@ export const useStudioV2 = create<StudioV2State>((set, get) => ({
     set((state) => ({ referenceImages: state.referenceImages.filter((_, item) => item !== index) })),
   clearReferenceImages: () => set({ referenceImages: [] }),
   setPrintProfile: (profile) => set({ printProfile: profile }),
+  setPrintSetupOpen: (open) => set({ printSetupOpen: open }),
+  setPrintCheckOpen: (open) => set({ printCheckOpen: open }),
   setDriverValue: (driverId, value) => {
     set((state) => ({ driverValues: { ...state.driverValues, [driverId]: value } }));
   },
@@ -498,6 +506,8 @@ export const useStudioV2 = create<StudioV2State>((set, get) => ({
       isolatedInstanceId: null,
       referenceImages: [],
       printProfile: null,
+      printSetupOpen: false,
+      printCheckOpen: false,
       sourceDraft: document.definitions[0]?.source ?? "", 
       dirtyDefinitionId: null,
       notice: null,

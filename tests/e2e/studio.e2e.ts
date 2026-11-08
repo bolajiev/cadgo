@@ -212,3 +212,50 @@ test("contextual motion plays the selected group's driver", async ({ page }) => 
 
   expect(pageErrors).toEqual([]);
 });
+
+test("print check uses a real print profile and reports fit and watertightness", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/studio");
+  await expect(page.locator(".v2-tree")).toBeVisible({ timeout: 60_000 });
+  await page.locator("summary").filter({ hasText: "Benchbook" }).click();
+  await page.locator("button.chip").filter({ hasText: /^Mounting plate$/ }).click();
+  await expect
+    .poll(
+      async () => {
+        const statuses = await page.locator(".v2-status").allTextContents();
+        return statuses.length === 1 && statuses[0] === "ready";
+      },
+      { timeout: 60_000 },
+    )
+    .toBe(true);
+  await page.locator("summary").filter({ hasText: "Benchbook" }).click();
+
+  await page.locator(".v2-export summary").click();
+  await page.locator(".v2-export .menu-item").filter({ hasText: "Print check" }).click();
+  await expect(page.getByRole("dialog", { name: "Print check" })).toContainText("Set a 3D printing profile");
+  await page.getByRole("dialog", { name: "Print check" }).locator(".modal-actions button").filter({ hasText: "Close" }).click();
+
+  await page.locator(".v2-left-tab").filter({ hasText: "Agent" }).click();
+  await page.locator(".v2-agent-tool").filter({ hasText: "Print setup" }).click();
+  await expect(page.locator(".v2-setup-overlay")).toBeVisible();
+  const bed = async (axis: "X" | "Y" | "Z", value: string) => {
+    const field = page.locator(".studio-setup-fields label").filter({ hasText: `Bed ${axis}` });
+    await field.locator("input").fill(value);
+  };
+  await bed("X", "220");
+  await bed("Y", "220");
+  await bed("Z", "250");
+  await page.locator(".studio-setup-actions button").filter({ hasText: "Use setup" }).click();
+  await expect(page.locator(".v2-setup-overlay")).toHaveCount(0);
+
+  await page.locator(".v2-export summary").click();
+  await page.locator(".v2-export .menu-item").filter({ hasText: "Print check" }).click();
+  const report = page.getByRole("dialog", { name: "Print check" });
+  await expect(report).toContainText("Ready to print");
+  await expect(report).toContainText("Mounting plate");
+  await expect(report).toContainText("fits");
+  await expect(report).toContainText("Solid mass");
+  expect(pageErrors).toEqual([]);
+});

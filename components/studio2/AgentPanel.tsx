@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useStudioV2 } from "@/lib/studio/v2/store";
 import { fileToStudioImage } from "@/lib/studio/image";
-import { PrintSetup } from "@/components/studio/PrintSetup";
 import { MarkdownText } from "./MarkdownText";
 import {
   answerAgentQuestion,
@@ -33,10 +32,9 @@ export function AgentPanel() {
   const addReferenceImage = useStudioV2((state) => state.addReferenceImage);
   const removeReferenceImage = useStudioV2((state) => state.removeReferenceImage);
   const printProfile = useStudioV2((state) => state.printProfile);
-  const setPrintProfile = useStudioV2((state) => state.setPrintProfile);
+  const setPrintSetupOpen = useStudioV2((state) => state.setPrintSetupOpen);
   const lastUser = [...chat].reverse().find((entry) => entry.role === "user");
   const [draft, setDraft] = useState("");
-  const [showSetup, setShowSetup] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     if (status !== "thinking") {
@@ -234,28 +232,6 @@ export function AgentPanel() {
         ) : null}
       </div>
 
-      {showSetup ? (
-        <div
-          className="v2-setup-overlay"
-          onPointerDown={(event) => {
-            if (event.target === event.currentTarget) setShowSetup(false);
-          }}
-        >
-          <div className="v2-setup-card">
-            <PrintSetup
-              initial={printProfile}
-              hasImage={referenceImages.length > 0}
-              onSave={(profile) => {
-                setPrintProfile(profile);
-                setShowSetup(false);
-                setNotice("Print / process setup saved.");
-              }}
-              onCancel={() => setShowSetup(false)}
-            />
-          </div>
-        </div>
-      ) : null}
-
       <div className="v2-agent-compose">
         {referenceImages.length ? (
           <div className="v2-agent-image-list">
@@ -289,7 +265,7 @@ export function AgentPanel() {
           </button>
           <button
             className={`v2-agent-tool ${printProfile ? "active" : ""}`}
-            onClick={() => setShowSetup(true)}
+            onClick={() => setPrintSetupOpen(true)}
             title="Set print purpose, printer and bed"
           >
             <Icon name="printer" size={11} /> {profileLabel}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
-import type { BuildPurpose, PrintBed, PrintProfile } from "@/lib/studio/profile";
+import { DEFAULT_MAX_OVERHANG_PERCENT, type BuildPurpose, type PrintBed, type PrintProfile } from "@/lib/studio/profile";
 
 const PURPOSES: { id: BuildPurpose; label: string }[] = [
   { id: "3d-print", label: "3D printing" },
@@ -29,6 +29,7 @@ export function PrintSetup({
   const [bed, setBed] = useState<PrintBed>(initial?.bed ?? { x: 0, y: 0, z: 0 });
   const [material, setMaterial] = useState(initial?.material ?? "PLA");
   const [supports, setSupports] = useState<"none" | "allowed">(initial?.supports ?? "none");
+  const [maxOverhang, setMaxOverhang] = useState(initial?.maxOverhangPercent ?? DEFAULT_MAX_OVERHANG_PERCENT);
   const [scaleNote, setScaleNote] = useState(initial?.scaleNote ?? "");
   const [scaleEstimated, setScaleEstimated] = useState(initial?.scaleEstimated ?? false);
   const validBed = bed.x > 0 && bed.y > 0 && bed.z > 0;
@@ -43,6 +44,7 @@ export function PrintSetup({
       profile.bed = bed;
       profile.material = material;
       profile.supports = supports;
+      profile.maxOverhangPercent = maxOverhang;
     }
     if (scaleNote.trim()) profile.scaleNote = scaleNote.trim();
     if (scaleEstimated) profile.scaleEstimated = true;
@@ -147,6 +149,16 @@ export function PrintSetup({
                 <option value="none">None — self-supporting</option>
                 <option value="allowed">Allowed</option>
               </select>
+            </label>
+            <label>
+              <span>Overhang warning <em>%</em></span>
+              <input
+                type="number"
+                min={5}
+                max={80}
+                value={maxOverhang}
+                onChange={(event) => setMaxOverhang(Math.max(5, Math.min(80, Number(event.target.value) || DEFAULT_MAX_OVERHANG_PERCENT)))}
+              />
             </label>
           </div>
           <p className="studio-setup-hint">

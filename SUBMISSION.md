@@ -20,6 +20,7 @@ CAD is still expert software, and most AI 3D tools stop at a mesh. Cadgo gives h
 - CAD workspace: orthographic stage, standard views, axis gizmo, overall dimension lines, assembly tree, 3D selection, translate/rotate gizmo, isolate, group transforms and a per-part inspector.
 - Per-instance parameter overrides compiled as separate variants.
 - Material inspector with source-colour and override modes, colour, metalness, roughness and opacity per definition or instance.
+- Print check from the compiled mesh: watertightness, overhang against a configurable limit, bed fit, solid volume and a material-density mass estimate. The same report gates STL export.
 - Image reference (up to three views) and optional print setup (purpose, printer, bed, material, supports); the print profile gates STL export on bed overflow.
 - Expression-driven motion as working logic for mechanisms and scenes: revolute, prismatic and link joints, including group joints so a complete rotor/fan subassembly spins intact; crank-angle and rotor-angle drivers; contextual motion (select a part or group and play its driver, or double-click a moving part); concept labs for a driven wind turbine, a lighthouse scene, a V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle.
 - Inspection sheets rendered from the assembled scene and returned to the agent as vision evidence.
@@ -52,6 +53,7 @@ The core journey fits on one screen: describe a part or scene, watch the agent b
 - Expression-driven joints using a restricted expression parser; no server geometry and no recompile for motion.
 - Definition materials with explicit per-instance overrides; an override never mutates the shared definition.
 - Scene GLB export with the group hierarchy, resolved materials and one animation clip per driver; a scene with no drivers exports static.
+- Print checks are based on real mesh metrics; wall thickness and slicer time are not measured, and mass assumes 100% infill.
 - Orthographic CAD stage with view gizmo, dimension annotations and transparent materials.
 - Parametric audit extended to top-level geometry calls and external includes.
 - Server-only API key, per-session and per-IP rate limits with an optional durable Redis (Upstash or Vercel KV) store, no account, local documents. Optional large-share storage through Vercel Blob or a local `.data/shares` directory.

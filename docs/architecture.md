@@ -46,6 +46,17 @@ Geometry exports run entirely in the browser; the server never receives a mesh. 
 
 The shared extension point is `placedVariants`: it yields the instance, compiled mesh, world matrix and resolved material. `buildSceneGroup` preserves local transforms and group parenting; `buildSceneGlb` exports that hierarchy; `buildPartStlBundle` reuses `instanceStl`. All formats are browser-local and share the same visibility, suppression, material and unit rules.
 
+## Print checks
+
+`buildPrintCheck` is the single source of truth for manufacturing checks. It reads the visible compiled variants and the print profile, then reports:
+
+- watertightness from boundary and non-manifold edge counts;
+- overhang percentage against `maxOverhangPercent` (default 35%) and whether supports are allowed;
+- assembly bounds against the print bed;
+- solid volume and a mass estimate from the material density.
+
+The print-check dialog and the STL/Part STL export gate both consume the same report, so the warning and the block cannot disagree. Wall thickness and slicer time are deliberately not estimated: the OpenSCAD mesh kernel does not provide them, and a fake number would be worse than an explicit non-goal.
+
 ## Compile path
 
 OpenSCAD runs as WebAssembly in a browser module worker pool. The compile controller keeps a cache keyed by source plus parameter values, compiles per-instance parameter variants separately, and retains the last good mesh when a compile fails. Metrics and compiler logs travel back to the UI and the agent. The server is a model proxy only; there is no server-side geometry execution.

@@ -9,12 +9,14 @@ export function Modal({
   onClose,
   actions,
   eyebrow,
+  className,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   actions?: ReactNode;
   eyebrow?: string;
+  className?: string;
 }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -26,7 +28,7 @@ export function Modal({
 
   return (
     <div className="modal-veil" onPointerDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`modal ${className ?? ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="panel-head" style={{ margin: "-16px -16px 12px", padding: "0 12px" }}>
           <span className="panel-label">{eyebrow ?? "Cadgo"}</span>
           <button className="icon-btn" onClick={onClose} aria-label="Close">
