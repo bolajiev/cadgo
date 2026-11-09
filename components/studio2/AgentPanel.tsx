@@ -123,7 +123,7 @@ export function AgentPanel() {
         {chat.map((entry) => (
           <div className={`v2-agent-message ${entry.role}`} key={entry.id}>
             <div className="v2-agent-message-top">
-              <span className="mono">{entry.role === "user" ? "You" : entry.role === "system" ? "Agent" : "Cadgo"}</span>
+              <span className="mono">{entry.role === "user" ? "You" : entry.role === "system" ? "Engine" : "Cadgo"}</span>
             </div>
             {entry.images?.length
               ? entry.images.map((image, index) => (

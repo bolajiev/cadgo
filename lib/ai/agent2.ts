@@ -39,8 +39,8 @@ const UPSTREAM_TIMEOUT_MS = (() => {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 240000;
 })();
 
-const UPSTREAM_TIMEOUT_MESSAGE =
-  "The CAD agent took too long to respond. Try again or split the request into smaller steps.";
+const UPSTREAM_TIMEOUT_MINUTES = Math.max(1, Math.round(UPSTREAM_TIMEOUT_MS / 60000));
+const UPSTREAM_TIMEOUT_MESSAGE = `The model did not finish one response within ${UPSTREAM_TIMEOUT_MINUTES} minute${UPSTREAM_TIMEOUT_MINUTES === 1 ? "" : "s"}. Your work is safe. Retry, or split the request into a smaller edit.`;
 
 type UpstreamAbort = {
   signal: AbortSignal;

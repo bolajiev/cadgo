@@ -84,7 +84,7 @@ describe("runAgentTurnV2 upstream timeout", () => {
     );
     const assertion = expect(pending).rejects.toMatchObject({
       status: 504,
-      message: "The CAD agent took too long to respond. Try again or split the request into smaller steps.",
+      message: "The model did not finish one response within 1 minute. Your work is safe. Retry, or split the request into a smaller edit.",
     });
     await vi.advanceTimersByTimeAsync(1000);
     await assertion;

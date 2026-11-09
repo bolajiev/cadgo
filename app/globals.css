@@ -6824,8 +6824,8 @@ a {
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px;
+  gap: 0;
+  padding: 10px 12px 16px;
 }
 
 .v2-agent-empty {
@@ -6846,56 +6846,98 @@ a {
 
 .v2-agent-prompt {
   width: 100%;
-  padding: 7px 8px;
-  border: 1px solid var(--line);
-  background: var(--panel-soft);
-  color: var(--ink-soft);
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
   text-align: left;
   font: 11px/1.45 var(--sans);
   cursor: pointer;
 }
 
+.v2-agent-prompt:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
 .v2-agent-prompt:hover {
-  border-color: var(--line-strong);
   color: var(--accent);
 }
 
 .v2-agent-message {
-  padding: 7px 8px;
-  border: 1px solid var(--line);
-  background: var(--panel-soft);
-}
-
-.v2-agent-message.user {
-  background: var(--paper-deep);
-}
-
-.v2-agent-message.assistant {
-  border-color: var(--line-strong);
-}
-
-.v2-agent-message.system {
-  border-style: dashed;
+  padding: 10px 0;
+  border: 0;
   background: transparent;
+}
+
+.v2-agent-message + .v2-agent-message {
+  border-top: 1px solid var(--line);
+}
+
+.v2-agent-message.user p {
+  color: var(--ink);
+}
+
+.v2-agent-message.system p {
   color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.v2-agent-message-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 3px;
 }
 
 .v2-agent-message-top span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--muted);
   font-size: 8px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
+.v2-agent-message-top span::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  background: var(--line-strong);
+}
+
+.v2-agent-message.user .v2-agent-message-top span {
+  color: var(--ink-soft);
+}
+
+.v2-agent-message.user .v2-agent-message-top span::before {
+  background: var(--accent);
+}
+
+.v2-agent-message.assistant .v2-agent-message-top span::before {
+  background: var(--brass);
+}
+
+.v2-agent-message.system .v2-agent-message-top span {
+  color: var(--faint);
+}
+
+.v2-agent-message.system .v2-agent-message-top span::before {
+  background: var(--faint);
+}
+
 .v2-agent-message p {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--ink-soft);
   font-size: 12px;
   line-height: 1.6;
 }
 
 .v2-markdown {
-  margin-top: 4px;
+  margin-top: 0;
   color: var(--ink-soft);
   font-size: 12px;
   line-height: 1.65;
@@ -6987,9 +7029,9 @@ a {
 }
 
 .v2-agent-inspection {
-  padding: 7px;
-  border: 1px solid var(--line-strong);
-  background: var(--panel-soft);
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
 }
 
 .v2-agent-inspection-head {
@@ -7021,9 +7063,11 @@ a {
 }
 
 .v2-agent-question {
-  padding: 8px;
-  border: 1px solid var(--accent);
-  background: var(--accent-soft);
+  margin: 4px 0;
+  padding: 6px 0 6px 10px;
+  border: 0;
+  border-left: 2px solid var(--accent);
+  background: transparent;
 }
 
 .v2-agent-question p {
@@ -7055,7 +7099,8 @@ a {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 7px 8px;
+  margin: 4px 0;
+  padding: 4px 0 4px 10px;
   border-left: 2px solid var(--accent);
   color: var(--muted);
   font-size: 9px;
@@ -7066,11 +7111,14 @@ a {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px;
-  border: 1px solid var(--brass);
-  background: #241b10;
+  margin: 4px 0;
+  padding: 6px 0 6px 10px;
+  border: 0;
+  border-left: 2px solid var(--brass);
+  background: transparent;
   color: #e9bd75;
   font-size: 9px;
+  line-height: 1.5;
 }
 
 .v2-agent-error span {
@@ -7464,13 +7512,15 @@ a {
 
 
 .v2-reasoning {
-  margin: 6px 0;
-  border: 1px solid var(--line);
-  background: var(--paper-deep);
+  margin: 5px 0 7px;
+  padding-left: 8px;
+  border: 0;
+  border-left: 2px solid var(--line-strong);
+  background: transparent;
 }
 
 .v2-reasoning summary {
-  padding: 6px 8px;
+  padding: 0;
   color: var(--muted);
   cursor: pointer;
   list-style: none;
@@ -7481,13 +7531,13 @@ a {
 }
 
 .v2-reasoning[open] summary {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0;
 }
 
 .v2-reasoning-body {
   max-height: 180px;
   overflow: auto;
-  padding: 8px;
+  padding: 4px 0 0;
   color: var(--muted);
   font-family: var(--mono);
   font-size: 9px;
