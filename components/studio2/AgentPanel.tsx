@@ -69,6 +69,7 @@ export function AgentPanel() {
   const messagesRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
+  const programmaticScrollRef = useRef(false);
   const imageRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
@@ -87,10 +88,18 @@ export function AgentPanel() {
     }
   };
 
-  useEffect(() => {
-    if (!stickRef.current) return;
+  const scrollToBottom = () => {
     const node = messagesRef.current;
-    if (node) node.scrollTop = node.scrollHeight;
+    if (!node) return;
+    programmaticScrollRef.current = true;
+    node.scrollTop = node.scrollHeight;
+    window.requestAnimationFrame(() => {
+      programmaticScrollRef.current = false;
+    });
+  };
+
+  useEffect(() => {
+    if (stickRef.current) scrollToBottom();
   }, [chat, status, inspection]);
 
   useEffect(() => {
@@ -98,7 +107,7 @@ export function AgentPanel() {
     const stream = streamRef.current;
     if (!node || !stream) return;
     const follow = () => {
-      if (stickRef.current) node.scrollTop = node.scrollHeight;
+      if (stickRef.current) scrollToBottom();
     };
     const observer = new ResizeObserver(follow);
     observer.observe(stream);
@@ -107,6 +116,7 @@ export function AgentPanel() {
   }, []);
 
   const onMessagesScroll = () => {
+    if (programmaticScrollRef.current) return;
     const node = messagesRef.current;
     if (!node) return;
     stickRef.current = node.scrollTop + node.clientHeight >= node.scrollHeight - 24;
@@ -215,7 +225,13 @@ export function AgentPanel() {
               </a>
             </div>
             <a href={inspection.dataUrl} target="_blank" rel="noreferrer">
-              <img src={inspection.dataUrl} alt="Assembly inspection sheet" />
+              <img
+                src={inspection.dataUrl}
+                alt="Assembly inspection sheet"
+                onLoad={() => {
+                  if (stickRef.current) scrollToBottom();
+                }}
+              />
             </a>
             <span className="mono">{inspection.views.join(" · ").toUpperCase()}</span>
           </div>

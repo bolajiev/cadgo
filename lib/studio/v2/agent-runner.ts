@@ -453,10 +453,35 @@ async function updateDefinition(args: Record<string, unknown>): Promise<ToolOutc
   };
 }
 
+const TOOL_ACTIVITY: Record<string, string> = {
+  list_model: "Reading the model",
+  get_definition: "Reading the part source",
+  create_definition: "Creating a part",
+  update_definition: "Updating a part",
+  delete_definition: "Deleting a part",
+  create_group: "Building the assembly tree",
+  update_group: "Updating the assembly tree",
+  delete_group: "Deleting a group",
+  create_instance: "Placing a part",
+  update_instance: "Updating a part",
+  delete_instance: "Deleting a part",
+  create_driver: "Adding a driver",
+  update_driver: "Updating a driver",
+  delete_driver: "Deleting a driver",
+  create_joint: "Adding a joint",
+  update_joint: "Updating a joint",
+  delete_joint: "Deleting a joint",
+  render_views: "Rendering inspection views",
+  web_research: "Researching",
+  ask_user: "Asking for input",
+  answer_user: "Answering",
+};
+
 async function executeTool(call: AgentToolCall): Promise<ToolOutcome> {
   const name = call.function?.name;
   const args = parseArgs(call.function?.arguments) ?? {};
   if (!name) return { result: { ok: false, error: "Unknown tool call." } };
+  if (TOOL_ACTIVITY[name]) setActivity(TOOL_ACTIVITY[name]);
 
   switch (name) {
     case "list_model":
