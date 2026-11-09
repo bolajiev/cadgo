@@ -969,7 +969,7 @@ function finishWithError(message: string) {
 async function runLoop(token: number) {
   if (token !== requestSeq) return;
   const state = useStudioV2.getState();
-  if (state.agentSteps >= state.agentBudget) {
+  if (state.agentBudget > 0 && state.agentSteps >= state.agentBudget) {
     finishWithError(`The agent reached its ${state.agentBudget}-step budget. Extend the budget or narrow the request.`);
     return;
   }
@@ -1051,7 +1051,7 @@ async function runLoop(token: number) {
             ? " The host may also be running an older Cadgo build; redeploy or open the current /studio host."
             : "";
         throw new Error(
-          `The CAD agent host returned an HTML error page (HTTP ${response.status}). This usually means a timeout, a deployment or protection error, or an overloaded server.${oldBuildHint} Try again or split the request into smaller steps.`,
+          `The Cadgo agent host ended the request (HTTP ${response.status}). Your work is safe. Retry.${oldBuildHint} A serverless host can cap a single function request; a long-running host does not.`,
         );
       }
       if (!response.ok) {
@@ -1073,7 +1073,7 @@ async function runLoop(token: number) {
   if (isEmptyAgentResponse(payload)) {
     const current = useStudioV2.getState();
     const step = current.agentSteps + 1;
-    if (step > current.agentBudget) {
+    if (current.agentBudget > 0 && step > current.agentBudget) {
       finishWithError(
         "The model returned an empty response repeatedly. Try again or split the request into smaller steps.",
       );
@@ -1088,7 +1088,7 @@ async function runLoop(token: number) {
       agentSteps: step,
       agentActivity: [
         ...state.agentActivity.slice(-5),
-        `Empty response; continuing · step ${step}/${state.agentBudget}`,
+        `Empty response; continuing · step ${step}${state.agentBudget > 0 ? `/${state.agentBudget}` : ""}`,
       ],
       agentMessages: [
         ...state.agentMessages,
@@ -1123,7 +1123,7 @@ async function runLoop(token: number) {
   if (payload.truncated) {
     const current = useStudioV2.getState();
     const step = current.agentSteps + 1;
-    if (step > current.agentBudget) {
+    if (current.agentBudget > 0 && step > current.agentBudget) {
       finishWithError(
         "The model hit its output limit repeatedly and the step budget is exhausted. Extend the budget or split the part into smaller definitions.",
       );
@@ -1138,7 +1138,7 @@ async function runLoop(token: number) {
       agentSteps: step,
       agentActivity: [
         ...state.agentActivity.slice(-5),
-        `Continuing after output limit · step ${step}/${state.agentBudget}`,
+        `Continuing after output limit · step ${step}${state.agentBudget > 0 ? `/${state.agentBudget}` : ""}`,
       ],
       agentMessages: [
         ...state.agentMessages,
@@ -1169,7 +1169,7 @@ async function runLoop(token: number) {
   for (const call of calls) {
     if (token !== requestSeq) return;
     const step = useStudioV2.getState().agentSteps + 1;
-    if (step > useStudioV2.getState().agentBudget) {
+    if (useStudioV2.getState().agentBudget > 0 && step > useStudioV2.getState().agentBudget) {
       finishWithError("The agent reached its step budget. Extend the budget or narrow the request.");
       return;
     }

@@ -57,7 +57,7 @@ The core journey fits on one screen: describe a part or scene, watch the agent b
 - Print checks are based on real mesh metrics; wall thickness and slicer time are not measured, and mass assumes 100% infill.
 - Orthographic CAD stage with view gizmo, dimension annotations, transparent materials and a presentation-lighting toggle with soft shadows.
 - Parametric audit extended to top-level geometry calls and external includes.
-- Server-only API key, per-session and per-IP rate limits with an optional durable Redis (Upstash or Vercel KV) store, no account, local documents. Optional large-share storage through Vercel Blob or a local `.data/shares` directory.
+- Server-only API key, optional per-session and per-IP rate limits (disabled by default) with an optional durable Redis (Upstash or Vercel KV) store, no account, local documents. Optional large-share storage through Vercel Blob or a local `.data/shares` directory.
 
 ## Links
 

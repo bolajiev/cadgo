@@ -34,40 +34,6 @@ const BASE_URL = process.env.OPENCODE_GO_BASE_URL ?? "https://opencode.ai/zen/go
 const MODEL = process.env.OPENCODE_GO_DESIGN_MODEL ?? "deepseek-v4.1-flash";
 const API_KEY = process.env.OPENCODE_GO_API_KEY ?? "";
 const MAX_TOKENS = Number(process.env.CADGO_AGENT_MAX_TOKENS ?? 24000);
-const UPSTREAM_TIMEOUT_MS = (() => {
-  const parsed = Number(process.env.CADGO_AGENT_UPSTREAM_TIMEOUT_MS ?? 240000);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 240000;
-})();
-
-const UPSTREAM_TIMEOUT_MINUTES = Math.max(1, Math.round(UPSTREAM_TIMEOUT_MS / 60000));
-const UPSTREAM_TIMEOUT_MESSAGE = `The model did not finish one response within ${UPSTREAM_TIMEOUT_MINUTES} minute${UPSTREAM_TIMEOUT_MINUTES === 1 ? "" : "s"}. Your work is safe. Retry, or split the request into a smaller edit.`;
-
-type UpstreamAbort = {
-  signal: AbortSignal;
-  timedOut: () => boolean;
-  dispose: () => void;
-};
-
-function combineWithTimeout(clientSignal: AbortSignal): UpstreamAbort {
-  const controller = new AbortController();
-  let timedOut = false;
-  const forwardAbort = () => controller.abort();
-  if (clientSignal.aborted) controller.abort();
-  else clientSignal.addEventListener("abort", forwardAbort, { once: true });
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, UPSTREAM_TIMEOUT_MS);
-  return {
-    signal: controller.signal,
-    timedOut: () => timedOut,
-    dispose: () => {
-      clearTimeout(timer);
-      clientSignal.removeEventListener("abort", forwardAbort);
-    },
-  };
-}
-
 const SYSTEM = AGENT_V2_SYSTEM_PROMPT;
 
 const vec3 = {
@@ -495,11 +461,9 @@ export async function runAgentTurnV2(
     { role: "system", content: system },
     ...sanitizeMessages(messages),
   ];
-  const upstream = combineWithTimeout(signal);
-  try {
-    const response = await fetch(`${BASE_URL}/chat/completions`, {
-      method: "POST",
-      signal: upstream.signal,
+  const response = await fetch(`${BASE_URL}/chat/completions`, {
+    method: "POST",
+    signal,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${API_KEY}`,
@@ -515,40 +479,34 @@ export async function runAgentTurnV2(
         max_tokens: Number.isFinite(MAX_TOKENS) && MAX_TOKENS > 0 ? MAX_TOKENS : 24000,
       }),
     });
-    const text = await response.text();
-    let payload: ChatResponse;
-    try {
-      payload = JSON.parse(text) as ChatResponse;
-    } catch {
-      throw new AgentError(`The CAD agent returned an unreadable response (${response.status}).`, 502);
-    }
-    if (!response.ok) {
-      const error = payload.error?.message ?? `HTTP ${response.status}`;
-      throw new AgentError(`CAD agent error: ${error}`, response.status === 429 ? 429 : 502);
-    }
-    const choice = payload.choices?.[0];
-    if (!choice) throw new AgentError("The CAD agent returned no result.", 502);
-    if (choice.finish_reason === "length") {
-      return {
-        role: "assistant",
-        content: choice.message?.content ?? "",
-        tool_calls: [],
-        model: MODEL,
-        truncated: true,
-      };
-    }
+  const text = await response.text();
+  let payload: ChatResponse;
+  try {
+    payload = JSON.parse(text) as ChatResponse;
+  } catch {
+    throw new AgentError(`The CAD agent returned an unreadable response (${response.status}).`, 502);
+  }
+  if (!response.ok) {
+    const error = payload.error?.message ?? `HTTP ${response.status}`;
+    throw new AgentError(`CAD agent error: ${error}`, response.status === 429 ? 429 : 502);
+  }
+  const choice = payload.choices?.[0];
+  if (!choice) throw new AgentError("The CAD agent returned no result.", 502);
+  if (choice.finish_reason === "length") {
     return {
       role: "assistant",
       content: choice.message?.content ?? "",
-      tool_calls: choice.message?.tool_calls ?? [],
+      tool_calls: [],
       model: MODEL,
+      truncated: true,
     };
-  } catch (error) {
-    if (upstream.timedOut()) throw new AgentError(UPSTREAM_TIMEOUT_MESSAGE, 504);
-    throw error;
-  } finally {
-    upstream.dispose();
   }
+  return {
+    role: "assistant",
+    content: choice.message?.content ?? "",
+    tool_calls: choice.message?.tool_calls ?? [],
+    model: MODEL,
+  };
 }
 
 type ToolDelta = {
@@ -607,11 +565,10 @@ export function streamAgentTurnV2(
         close(controller);
         return;
       }
-      const upstream = combineWithTimeout(signal);
       try {
         const response = await fetch(`${BASE_URL}/chat/completions`, {
           method: "POST",
-          signal: upstream.signal,
+          signal,
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${API_KEY}`,
@@ -730,11 +687,6 @@ export function streamAgentTurnV2(
         });
         close(controller);
       } catch (error) {
-        if (upstream.timedOut()) {
-          send(controller, { type: "error", message: UPSTREAM_TIMEOUT_MESSAGE });
-          close(controller);
-          return;
-        }
         if (signal.aborted) {
           close(controller);
           return;
@@ -744,8 +696,6 @@ export function streamAgentTurnV2(
           message: error instanceof Error ? error.message : "The CAD agent stream failed.",
         });
         close(controller);
-      } finally {
-        upstream.dispose();
       }
     },
   });

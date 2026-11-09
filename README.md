@@ -76,17 +76,16 @@ Open `http://localhost:3000/` for the landing page and `/studio` for the assembl
 | `OPENCODE_GO_BASE_URL` | `https://opencode.ai/zen/go/v1` | OpenAI-compatible endpoint |
 | `OPENCODE_GO_DESIGN_MODEL` | `deepseek-v4.1-flash` | agent and vision model |
 | `CADGO_AGENT_MAX_TOKENS` | `24000` | agent output cap |
-| `CADGO_AGENT_UPSTREAM_TIMEOUT_MS` | `240000` | upstream model request timeout |
-| `CADGO_AGENT_RATE_LIMIT` | `200` | per-session agent requests per window; `0` disables |
+| `CADGO_AGENT_RATE_LIMIT` | `0` | optional per-session request limit; `0` disables |
 | `CADGO_AGENT_RATE_WINDOW_MS` | `3600000` | rate-limit window |
-| `CADGO_AGENT_IP_RATE_LIMIT` | `1000` | per-IP agent requests per window across sessions; `0` disables |
+| `CADGO_AGENT_IP_RATE_LIMIT` | `0` | optional per-IP request limit; `0` disables |
 | `UPSTASH_REDIS_REST_URL` | — | optional durable rate-limit store; Vercel KV's `KV_REST_API_URL` also works |
 | `UPSTASH_REDIS_REST_TOKEN` | — | token for the durable rate-limit store; Vercel KV's `KV_REST_API_TOKEN` also works |
 | `BLOB_READ_WRITE_TOKEN` | — | optional large-share storage |
 | `CADGO_SHARE_DIR` | `.data/shares` | local large-share directory outside Vercel |
 | `CADGO_SHARE_TTL_DAYS` | `30` | large-share expiry |
 
-`CADGO_AGENT_RATE_LIMIT` is enforced per agent session; `CADGO_AGENT_IP_RATE_LIMIT` caps requests per IP so new sessions cannot bypass the budget. Without `UPSTASH_REDIS_REST_URL` the limiter is in-process (fine for local use and one instance); a multi-instance deployment should set the durable store.
+Both agent rate limits are optional and default to `0` (disabled). If you enable them, `CADGO_AGENT_RATE_LIMIT` applies per agent session and `CADGO_AGENT_IP_RATE_LIMIT` applies per IP. Without `UPSTASH_REDIS_REST_URL` the limiter is in-process (fine for local use and one instance); a multi-instance deployment should set the durable store.
 
 ### Checks
 

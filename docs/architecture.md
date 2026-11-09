@@ -68,10 +68,10 @@ The agent is a streaming, tool-using loop over the same assembly graph.
 - **Streaming** — the server relays server-sent events; the client renders text deltas and assembles tool-call deltas before executing them.
 - **Truncation continuation** — a response cut off by the output limit is marked truncated and the loop continues from the last unfinished point with a compact continuation instruction, rather than asking the user to prompt again.
 - **Empty-response recovery** — an empty assistant turn is not treated as a completed answer. The loop recovers or surfaces an error instead of ending silently.
-- **Upstream timeout** — the model request is bounded by a configurable upstream timeout (`CADGO_AGENT_UPSTREAM_TIMEOUT_MS`), separate from the user's ability to stop the run.
-- **Rate limits** — per-session requests are bounded by `CADGO_AGENT_RATE_LIMIT`; `CADGO_AGENT_IP_RATE_LIMIT` caps requests per IP so new sessions cannot bypass the budget. Both are configurable and `0` disables the limit. The limiter is a `RateLimitStore`: an in-process bucket for local use and a Redis REST adapter for Upstash or Vercel KV in multi-instance deployments. The durable store is optional and configured by environment, not hardcoded.
+- **No app-level request timeout** — the model call is not cut by Cadgo. A single HTTP request is bounded only by the hosting platform and the model provider. The user can stop a turn at any time.
+- **Rate limits** — optional and disabled by default. `CADGO_AGENT_RATE_LIMIT` applies per session; `CADGO_AGENT_IP_RATE_LIMIT` applies per IP. Set either to a positive number to enable it. The limiter is a `RateLimitStore`: an in-process bucket for local use and a Redis REST adapter for Upstash or Vercel KV in multi-instance deployments. The durable store is optional and configured by environment, not hardcoded.
 
-Budgets and limits are surfaced in configuration or the UI; there are no hidden fixed iteration counts or forced tool sequences. The model decides when to build, inspect, ask, revise or stop.
+The step count is visible in the UI, but there is no fixed step cap by default. The model decides when to build, inspect, ask, revise or stop; the user can stop the turn. Any optional limit is configuration, not hidden workflow.
 
 ## Non-goals
 

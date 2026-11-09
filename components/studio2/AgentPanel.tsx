@@ -47,6 +47,7 @@ export function AgentPanel() {
   }, [status]);
   const messagesRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
 
   const attachImages = async (files: File[] | FileList | null) => {
@@ -67,6 +68,13 @@ export function AgentPanel() {
     const node = messagesRef.current;
     if (node) node.scrollTop = node.scrollHeight;
   }, [chat, status, inspection]);
+
+  useEffect(() => {
+    const node = composerRef.current;
+    if (!node) return;
+    node.style.height = "auto";
+    node.style.height = `${Math.min(node.scrollHeight, 260)}px`;
+  }, [draft]);
 
   const send = () => {
     const text = draft.trim();
@@ -94,7 +102,7 @@ export function AgentPanel() {
         <span className="eyebrow">Agent</span>
         <span className="mono v2-muted">
           {statusLabel(status)}
-          {status === "thinking" ? ` · ${elapsed}s` : ""} · {steps}/{budget} steps
+          {status === "thinking" ? ` · ${elapsed}s` : ""} · {budget > 0 ? `${steps}/${budget} steps` : `${steps} steps`}
         </span>
       </div>
 
@@ -204,7 +212,7 @@ export function AgentPanel() {
             <button
               className="chip"
               onClick={() => {
-                if (/budget|steps/i.test(error)) {
+                if (/budget/i.test(error)) {
                   useStudioV2.setState({ agentBudget: budget + 40, agentError: null, agentStatus: "idle" });
                   setNotice("Agent budget extended by 40 steps.");
                 } else if (lastUser) {
@@ -215,7 +223,7 @@ export function AgentPanel() {
                 }
               }}
             >
-              {/budget|steps/i.test(error) ? "Extend +40" : lastUser ? "Retry" : "Dismiss"}
+              {/budget/i.test(error) ? "Extend +40" : lastUser ? "Retry" : "Dismiss"}
             </button>
           </div>
         ) : null}
@@ -266,6 +274,7 @@ export function AgentPanel() {
           />
         </div>
         <textarea
+          ref={composerRef}
           rows={2}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -286,7 +295,7 @@ export function AgentPanel() {
           }
         />
         <div className="v2-agent-actions">
-          <span className="mono v2-muted">⌘↵ · {budget - steps} steps left</span>
+          <span className="mono v2-muted">⌘↵ · {budget > 0 ? `${budget - steps} steps left` : `${steps} steps`}</span>
           {status === "thinking" ? (
             <button className="v2-agent-stop" onClick={stopAgent}>
               Stop

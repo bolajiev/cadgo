@@ -11,7 +11,7 @@ function positiveInt(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
 }
 
-const RATE_LIMIT = positiveInt(process.env.CADGO_SHARE_RATE_LIMIT, 30);
+const RATE_LIMIT = positiveInt(process.env.CADGO_SHARE_RATE_LIMIT, 0);
 const RATE_WINDOW_MS = positiveInt(process.env.CADGO_SHARE_RATE_WINDOW_MS, 60 * 60 * 1000);
 const schema = z.object({
   payload: z.string().min(10).max(2_000_000),

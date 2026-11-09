@@ -28,7 +28,7 @@ Every part, scene, fixture, example and generated artifact must be fully paramet
 - The model decides when to ask, build, render, inspect, revise, answer, or stop.
 - The user must be able to chat at any time, interrupt the run, stop it, and answer questions.
 - No automatic generation from a chat message; the model or an explicit user action decides whether to build.
-- Any cost/time budget must be visible and configurable. Hidden limits in product code are defects. A configurable upstream request timeout is allowed because it bounds one model HTTP call, not the agent's workflow; it must stay documented in the environment table.
+- Any cost/time budget must be visible and configurable. Hidden limits in product code are defects. The app does not impose an upstream request timeout; hosting-platform limits are documented separately.
 - No model fallback, no forced phases, no synthetic progress, and no stopgap wrappers presented as agent intelligence.
 - Before shipping agent changes, audit for hardcoded workflow constants and user-blocking UI.
 

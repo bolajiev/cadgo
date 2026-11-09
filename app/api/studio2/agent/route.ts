@@ -11,8 +11,8 @@ function positiveInt(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
 }
 
-const SESSION_RATE_LIMIT = positiveInt(process.env.CADGO_AGENT_RATE_LIMIT, 200);
-const IP_RATE_LIMIT = positiveInt(process.env.CADGO_AGENT_IP_RATE_LIMIT, 1000);
+const SESSION_RATE_LIMIT = positiveInt(process.env.CADGO_AGENT_RATE_LIMIT, 0);
+const IP_RATE_LIMIT = positiveInt(process.env.CADGO_AGENT_IP_RATE_LIMIT, 0);
 const RATE_WINDOW_MS = positiveInt(process.env.CADGO_AGENT_RATE_WINDOW_MS, 60 * 60 * 1000);
 
 // Explicit limiter namespaces: one budget per browser session (x-cadgo-session),

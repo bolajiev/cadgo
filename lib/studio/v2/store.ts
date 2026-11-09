@@ -158,7 +158,7 @@ export const useStudioV2 = create<StudioV2State>((set, get) => ({
   agentActivity: [],
   pendingQuestion: null,
   agentSteps: 0,
-  agentBudget: 120,
+  agentBudget: 0,
   agentError: null,
   inspection: null,
   agentModel: "",
