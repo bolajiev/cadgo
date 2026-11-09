@@ -3,7 +3,7 @@
 ## Current production
 
 - **Studio:** https://cadgo-3d.vercel.app/studio
-- **Vercel project:** `bolaji7773s-projects/cadgo-3d`
+- **Vercel project:** `cadgo-3d`
 - **Framework preset:** Next.js
 - **Required environment variable:** `OPENCODE_GO_API_KEY` (Production, Secret)
 - **Deployment protection:** disabled for the production domain

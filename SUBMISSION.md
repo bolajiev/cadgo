@@ -42,7 +42,7 @@ The system is an **agentic 3D assembly editor**. DeepSeek V4.1 Flash decides whe
 
 ## Demo quality
 
-- Recorded backup: `docs/cadgo-demo.mp4` (1:21, 1280×720, silent) with captions in `docs/cadgo-demo.srt`. The new real-world print walkthrough script — measure a replacement foot, model it, print-check it and export the STL — is in `DEMO_SCRIPT.md` and is intended for the next recording.
+- Recorded backup: `docs/cadgo-demo.mp4` (1:21, 1280×720, silent) with captions in `docs/cadgo-demo.srt`. The real-world print walkthrough script is kept out of the public repo and is intended for the next recording.
 
 The core journey fits on one screen: describe a part or scene, watch the agent build or edit it, adjust dimensions or source in the inspector, orbit or use standard views, drag the gizmo, then export STL, Scene GLB, Part STLs, SCAD and JSON. The agent remains usable while the user edits; questions and conflicts are non-blocking. Concept labs exercise larger assemblies, a driven wind turbine, a lighthouse scene, motion and transparent materials.
 

@@ -41,3 +41,8 @@ __pycache__/
 # Local large-share storage
 /.data/
 .vercel
+
+# Internal research, agent notes and the recording script stay local
+/docs/research/
+/docs/agents/
+/DEMO_SCRIPT.md
