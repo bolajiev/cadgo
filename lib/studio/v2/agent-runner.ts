@@ -8,6 +8,7 @@ import { renderAssemblySheet } from "./inspection";
 import { isMaterialMode } from "./material";
 import type { AgentMessage, AgentToolCall, ChatEntry, PendingQuestion } from "./agent-types";
 import type { StudioImage } from "../profile";
+import type { ResearchSource } from "../../research/types";
 
 type ToolOutcome = {
   result: unknown;
@@ -864,6 +865,60 @@ async function executeTool(call: AgentToolCall): Promise<ToolOutcome> {
       });
       if (!ok) return failure();
       return { result: { ok: true, jointId } };
+    }
+
+    case "web_research": {
+      const query = asString(args.query)?.trim() ?? "";
+      const url = asString(args.url)?.trim();
+      const depth = asString(args.depth) === "deep" ? "deep" : "quick";
+      if (!query && !url) return { result: { ok: false, error: "A query or URL is required." } };
+      try {
+        const response = await fetch("/api/studio2/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, url, depth }),
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          query?: string;
+          provider?: string;
+          warning?: string;
+          error?: string;
+          sources?: ResearchSource[];
+        };
+        if (!response.ok) {
+          return { result: { ok: false, error: data.error ?? `Research failed (HTTP ${response.status}).` } };
+        }
+        const sources = Array.isArray(data.sources)
+          ? data.sources.filter(
+              (source): source is ResearchSource =>
+                Boolean(
+                  source &&
+                    typeof source.title === "string" &&
+                    typeof source.url === "string" &&
+                    typeof source.host === "string" &&
+                    typeof source.snippet === "string",
+                ),
+            )
+          : [];
+        if (sources.length) {
+          const entry = chatEntry("system", `Researched: ${query || url}`);
+          entry.sources = sources;
+          appendChat(entry);
+          setActivity(`Researched ${query || url}`);
+        }
+        return {
+          result: {
+            ok: Boolean(sources.length) && !data.error,
+            query: data.query ?? query,
+            provider: data.provider,
+            sources,
+            warning: data.warning,
+            error: data.error,
+          },
+        };
+      } catch (error) {
+        return { result: { ok: false, error: error instanceof Error ? error.message : "Research failed." } };
+      }
     }
 
     case "render_views": {

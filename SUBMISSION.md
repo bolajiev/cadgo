@@ -27,6 +27,7 @@ CAD is still expert software, and most AI 3D tools stop at a mesh. Cadgo gives h
 - Exports: assembly STL, Scene GLB with the group hierarchy, resolved materials, driver animation clips and options for samples, duration and static export, a Part STLs ZIP with one transformed STL per visible instance plus the merged assembly, a ZIP with one editable SCAD per definition plus the assembly manifest and native document, plus `.cadgo.json`. Import `.scad` or `.cadgo.json`.
 - Compressed share links, with an optional Blob/local service for assemblies above the URL limit.
 - Starter library: project box cover, pipe adapter, furniture foot and desk cable clip, all parametric and audit-clean.
+- Guarded server-side web research for standards, fastener dimensions, printer build volumes, material properties, compatibility, regulations and real-product dimensions; sources are shown in the transcript and treated as untrusted evidence.
 - All benchbook studies pass the parametric audit; the unit/integration suite plus Playwright smoke, export and visual snapshot coverage verify the document, compile, motion, GLB, per-part STL and scene paths.
 
 ## Generalizability

@@ -252,6 +252,11 @@ export default function LandingPage() {
               <h3>Scene GLB</h3>
               <p>Group hierarchy, resolved materials and one animation clip per driver.</p>
             </article>
+            <article>
+              <span className="mono">07</span>
+              <h3>Guarded research</h3>
+              <p>Standards, fastener dimensions, printer specs and material data, with citations and untrusted-content handling.</p>
+            </article>
           </div>
         </section>
 
@@ -282,6 +287,10 @@ export default function LandingPage() {
             <li>
               <strong>Local-first by design.</strong>
               <p>Documents autosave in your browser. Share links are explicit; there is no account or cloud project database.</p>
+            </li>
+            <li>
+              <strong>Research is evidence, not certification.</strong>
+              <p>Web sources can be wrong, incomplete or conflict. Critical dimensions still need an authoritative source.</p>
             </li>
           </ul>
         </section>

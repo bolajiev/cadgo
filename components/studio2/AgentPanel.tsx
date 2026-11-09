@@ -152,6 +152,17 @@ export function AgentPanel() {
               <p>{entry.text}</p>
             )}
             {entry.streaming ? <span className="v2-stream-caret" /> : null}
+            {entry.sources?.length ? (
+              <div className="v2-agent-sources">
+                <span className="eyebrow">Sources</span>
+                {entry.sources.map((source, index) => (
+                  <a key={`${source.url}-${index}`} href={source.url} target="_blank" rel="noreferrer">
+                    <span>{source.title}</span>
+                    <span className="mono">{source.host}</span>
+                  </a>
+                ))}
+              </div>
+            ) : null}
             {entry.note ? <span className="mono v2-agent-note">{entry.note}</span> : null}
           </div>
         ))}

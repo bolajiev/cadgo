@@ -57,6 +57,14 @@ The shared extension point is `placedVariants`: it yields the instance, compiled
 
 The print-check dialog and the STL/Part STL export gate both consume the same report, so the warning and the block cannot disagree. Wall thickness and slicer time are deliberately not estimated: the OpenSCAD mesh kernel does not provide them, and a fake number would be worse than an explicit non-goal.
 
+## Web research
+
+The agent can call `web_research` when a correct answer depends on an external fact: a named standard, a fastener or thread dimension, a printer build volume, a material property, vendor compatibility, a regulation or a real-product dimension. The tool is not a fixed workflow; the model decides when the fact is uncertain enough to verify.
+
+Research is server-side. The client sends a short query or a public URL, never the document. `lib/research` owns the provider adapters (Brave, Tavily, Serper), the keyless DuckDuckGo/Wikipedia fallback, the 10-minute cache, and the readable-page extraction. The agent receives titles, URLs, snippets and bounded excerpts; the transcript shows the sources.
+
+The fetch guard rejects non-HTTP(S), credentialed URLs, non-standard ports and private/loopback/link-local DNS results, re-checks every redirect, enforces a 6-second fetch timeout and a byte limit, and only reads text/HTML/JSON. Those are security bounds on a public fetch, not agent task limits. Web content is explicitly untrusted: the model is told to use it as evidence, never follow instructions found in a page, cite the URL, and say when sources conflict or are missing.
+
 ## Compile path
 
 OpenSCAD runs as WebAssembly in a browser module worker pool. The compile controller keeps a cache keyed by source plus parameter values, compiles per-instance parameter variants separately, and retains the last good mesh when a compile fails. Metrics and compiler logs travel back to the UI and the agent. The server is a model proxy only; there is no server-side geometry execution.

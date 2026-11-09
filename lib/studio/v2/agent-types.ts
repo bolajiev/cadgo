@@ -1,3 +1,5 @@
+import type { ResearchSource } from "../../research/types";
+
 export type AgentToolCall = {
   id?: string;
   type?: string;
@@ -30,6 +32,7 @@ export type ChatEntry = {
   images?: string[];
   streaming?: boolean;
   reasoning?: string;
+  sources?: ResearchSource[];
 };
 
 export type Inspection = {

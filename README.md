@@ -30,6 +30,7 @@ CAD-grade parametric editing stays the core: named dimensions, editable source, 
 - **Local compile pool.** Two OpenSCAD WASM workers compile definitions in parallel; variants are cached by source + parameter hash. Failed parts keep the last good mesh and expose the compiler log.
 - **Image and print setup.** Attach up to three reference views; open **Print check → Edit print setup** to set purpose, printer, bed, material, supports and the overhang warning limit. The print profile gates STL export and drives the print check.
 - **Inspection.** The agent requests orthographic views; the browser renders the assembly and returns it to the model as vision evidence.
+- **Guarded web research.** The agent can verify standards, fastener dimensions, printer build volumes, material properties, vendor compatibility, regulations and real-product dimensions. Results are server-fetched with SSRF, redirect, port, content-size and content-type guards; pages are treated as untrusted evidence and sources are shown in the transcript.
 - **Motion.** Joints and drivers are the working logic for mechanisms and scenes: expression-driven revolute/prismatic/link joints, with a whole group as the joint target so a rotor or fan spins intact without separating its blades. Select a part or group and play its driver in the inspector, or double-click a moving part in the stage. Concept labs include a V8 and a transparent rotary mechanism.
 - **Print check.** Real compiled-mesh checks: watertightness, overhang percentage against a configurable limit, bed fit, solid volume and a material-density mass estimate. The same report gates STL export. Wall thickness and slicer time are not measured.
 - **Export and import.** Exports are assembly STL, a Scene GLB with the group hierarchy, resolved materials, driver animation clips and options for samples, duration and static export, a Part STLs ZIP (one transformed STL per visible instance plus the merged assembly), a ZIP with one editable SCAD per definition plus the assembly manifest and native document, `.cadgo.json`, and compressed share links. Import `.scad` as a new part or `.cadgo.json` to restore a complete assembly.
@@ -75,6 +76,10 @@ Open `http://localhost:3000/` for the landing page and `/studio` for the assembl
 | `OPENCODE_GO_API_KEY` | — | server-side key; never sent to the browser |
 | `OPENCODE_GO_BASE_URL` | `https://opencode.ai/zen/go/v1` | OpenAI-compatible endpoint |
 | `OPENCODE_GO_DESIGN_MODEL` | `deepseek-v4.1-flash` | agent and vision model |
+| `BRAVE_SEARCH_API_KEY` | — | optional Brave Search key for general web research |
+| `TAVILY_API_KEY` | — | optional Tavily key for general web research |
+| `SERPER_API_KEY` | — | optional Serper key for general web research |
+| `WEB_SEARCH_PROVIDER` | — | preferred research provider; falls back to DDG/Wikipedia without a key |
 | `CADGO_AGENT_MAX_TOKENS` | `24000` | agent output cap |
 | `CADGO_AGENT_RATE_LIMIT` | `0` | optional per-session request limit; `0` disables |
 | `CADGO_AGENT_RATE_WINDOW_MS` | `3600000` | rate-limit window |
@@ -117,6 +122,7 @@ npm run build
 - Up to three reference views; no camera calibration, crop/rotate or photogrammetry.
 - No account or cloud project database. Documents autosave locally; an optional Blob/local store backs large share links.
 - Print check does not measure wall thickness or slicer time; those require a slicer or a B-Rep kernel. Mass assumes 100% infill.
+- Web research returns excerpts and sources, not certification. Verify critical dimensions against an authoritative source; sources can be wrong, incomplete or conflict.
 
 ## Judging alignment
 
