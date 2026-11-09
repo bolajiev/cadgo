@@ -5,11 +5,32 @@ import { Icon } from "@/components/ui/Icon";
 import { useStudioV2 } from "@/lib/studio/v2/store";
 import { fileToStudioImage } from "@/lib/studio/image";
 import { MarkdownText } from "./MarkdownText";
+import type { ChatEntry } from "@/lib/studio/v2/agent-types";
 import {
   answerAgentQuestion,
   sendAgentMessage,
   stopAgent,
 } from "@/lib/studio/v2/agent-runner";
+
+function ReasoningBlock({ entry }: { entry: ChatEntry }) {
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    if (entry.streaming) setOpen(true);
+  }, [entry.streaming]);
+  return (
+    <details
+      className="v2-reasoning"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        <span className="eyebrow">Thinking</span>
+        {entry.streaming ? <span className="mono v2-reasoning-live">live</span> : null}
+      </summary>
+      <div className="v2-reasoning-body">{entry.reasoning}</div>
+    </details>
+  );
+}
 
 function statusLabel(status: string) {
   if (status === "thinking") return "Working";
@@ -46,6 +67,8 @@ export function AgentPanel() {
     return () => window.clearInterval(timer);
   }, [status]);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const streamRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
   const imageRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,9 +88,29 @@ export function AgentPanel() {
   };
 
   useEffect(() => {
+    if (!stickRef.current) return;
     const node = messagesRef.current;
     if (node) node.scrollTop = node.scrollHeight;
   }, [chat, status, inspection]);
+
+  useEffect(() => {
+    const node = messagesRef.current;
+    const stream = streamRef.current;
+    if (!node || !stream) return;
+    const follow = () => {
+      if (stickRef.current) node.scrollTop = node.scrollHeight;
+    };
+    const observer = new ResizeObserver(follow);
+    observer.observe(stream);
+    follow();
+    return () => observer.disconnect();
+  }, []);
+
+  const onMessagesScroll = () => {
+    const node = messagesRef.current;
+    if (!node) return;
+    stickRef.current = node.scrollTop + node.clientHeight >= node.scrollHeight - 24;
+  };
 
   useEffect(() => {
     const node = composerRef.current;
@@ -93,6 +136,7 @@ export function AgentPanel() {
       return;
     }
     setDraft("");
+    stickRef.current = true;
     void sendAgentMessage(text, referenceImages);
   };
 
@@ -107,7 +151,8 @@ export function AgentPanel() {
         </span>
       </div>
 
-      <div className="v2-agent-messages" ref={messagesRef}>
+      <div className="v2-agent-messages" ref={messagesRef} onScroll={onMessagesScroll}>
+        <div className="v2-agent-stream" ref={streamRef}>
         {!chat.length ? (
           <div className="v2-agent-empty">
             <p>
@@ -139,14 +184,7 @@ export function AgentPanel() {
                   <img className="v2-agent-image" src={image} alt={`Reference ${index + 1}`} key={index} />
                 ))
               : null}
-            {entry.reasoning?.trim() ? (
-              <details className={`v2-reasoning ${entry.streaming ? "streaming" : ""}`} open={Boolean(entry.streaming)}>
-                <summary>
-                  <span className="eyebrow">Thinking</span>
-                </summary>
-                <div className="v2-reasoning-body">{entry.reasoning}</div>
-              </details>
-            ) : null}
+            {entry.reasoning?.trim() ? <ReasoningBlock entry={entry} /> : null}
             {entry.role === "assistant" ? (
               <MarkdownText text={entry.text} />
             ) : (
@@ -239,6 +277,7 @@ export function AgentPanel() {
             </button>
           </div>
         ) : null}
+        </div>
       </div>
 
       <div className="v2-agent-compose">
