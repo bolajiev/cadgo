@@ -103,6 +103,7 @@ export function AgentPanel() {
         <span className="mono v2-muted">
           {statusLabel(status)}
           {status === "thinking" ? ` · ${elapsed}s` : ""} · {budget > 0 ? `${steps}/${budget} steps` : `${steps} steps`}
+          {status === "thinking" && activity.length ? ` · ${activity[activity.length - 1]}` : ""}
         </span>
       </div>
 
@@ -139,7 +140,7 @@ export function AgentPanel() {
                 ))
               : null}
             {entry.reasoning?.trim() ? (
-              <details className="v2-reasoning" open={Boolean(entry.streaming)}>
+              <details className={`v2-reasoning ${entry.streaming ? "streaming" : ""}`} open={Boolean(entry.streaming)}>
                 <summary>
                   <span className="eyebrow">Thinking</span>
                 </summary>

@@ -944,6 +944,7 @@ async function executeTool(call: AgentToolCall): Promise<ToolOutcome> {
         });
         useStudioV2.setState({ inspection: { dataUrl: sheet.dataUrl, views: sheet.views, title: state.document.name } });
         setActivity(`Rendered ${sheet.views.join(", ")}`);
+        appendChat(chatEntry("system", `Rendered inspection · ${sheet.views.join(" · ")}`));
         return {
           result: { ok: true, views: sheet.views, width: sheet.width, height: sheet.height },
           extraMessages: [
@@ -1291,7 +1292,7 @@ export async function sendAgentMessage(text: string, images?: StudioImage[]): Pr
       },
     ],
     agentStatus: "thinking",
-    agentActivity: ["Reading your message"],
+    agentActivity: ["Planning the first step"],
     agentSteps: 0,
     agentError: null,
     inspection: null,
