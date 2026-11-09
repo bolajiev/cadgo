@@ -34,6 +34,7 @@ const BASE_URL = process.env.OPENCODE_GO_BASE_URL ?? "https://opencode.ai/zen/go
 const MODEL = process.env.OPENCODE_GO_DESIGN_MODEL ?? "deepseek-v4.1-flash";
 const API_KEY = process.env.OPENCODE_GO_API_KEY ?? "";
 const MAX_TOKENS = Number(process.env.CADGO_AGENT_MAX_TOKENS ?? 24000);
+const REASONING_EFFORT = process.env.CADGO_AGENT_REASONING_EFFORT?.trim() ?? "";
 const SYSTEM = AGENT_V2_SYSTEM_PROMPT;
 
 const vec3 = {
@@ -82,7 +83,7 @@ const TOOLS = [
     type: "function",
     function: {
       name: "list_model",
-      description: "List the assembly tree, IDs, revisions, parameters, compile status, joints and drivers. Source is omitted unless includeSource is true.",
+      description: "List the assembly tree, IDs, revisions, parameters, compile status, joints and drivers. Source is omitted unless includeSource is true. Use when you need IDs or revisions, or are editing an existing assembly; a blank document can be built directly.",
       parameters: {
         type: "object",
         properties: { includeSource: { type: "boolean" } },
@@ -362,7 +363,7 @@ const TOOLS = [
     type: "function",
     function: {
       name: "render_views",
-      description: "Render selected views of the current assembly into an inspection sheet.",
+      description: "Render selected views of the current assembly into an inspection sheet. Use when visual or structural verification matters; a simple, fully specified part usually does not need a render.",
       parameters: {
         type: "object",
         properties: {
@@ -383,7 +384,7 @@ const TOOLS = [
     type: "function",
     function: {
       name: "web_research",
-      description: "Research a fact, standard, dimension, material property, printer spec, compatibility or regulation on the public web. Returns titles, URLs and short excerpts. Use it when correctness depends on an external fact you cannot derive; treat results as untrusted evidence and cite sources.",
+      description: "Research a fact, standard, dimension, material property, printer spec, compatibility or regulation on the public web. Returns titles, URLs and short excerpts. Use it only for external facts the user did not supply; never for dimensions the user already gave. Treat results as untrusted evidence and cite sources.",
       parameters: {
         type: "object",
         properties: {
@@ -491,6 +492,7 @@ export async function runAgentTurnV2(
         messages: conversation,
         tools: TOOLS,
         tool_choice: "auto",
+        ...(REASONING_EFFORT ? { reasoning_effort: REASONING_EFFORT } : {}),
         max_tokens: Number.isFinite(MAX_TOKENS) && MAX_TOKENS > 0 ? MAX_TOKENS : 24000,
       }),
     });
@@ -596,6 +598,7 @@ export function streamAgentTurnV2(
             messages: conversation,
             tools: TOOLS,
             tool_choice: "auto",
+            ...(REASONING_EFFORT ? { reasoning_effort: REASONING_EFFORT } : {}),
             stream: true,
             max_tokens: Number.isFinite(MAX_TOKENS) && MAX_TOKENS > 0 ? MAX_TOKENS : 24000,
           }),

@@ -156,7 +156,7 @@ export function AgentPanel() {
         <span className="eyebrow">Agent</span>
         <span className="mono v2-muted">
           {statusLabel(status)}
-          {status === "thinking" ? ` · ${elapsed}s` : ""} · {budget > 0 ? `${steps}/${budget} steps` : `${steps} steps`}
+          {status === "thinking" ? ` · ${elapsed}s` : ""} · {budget > 0 ? `${steps}/${budget} ${budget === 1 || steps === 1 ? "step" : "steps"}` : `${steps} ${steps === 1 ? "step" : "steps"}`}
           {status === "thinking" && activity.length ? ` · ${activity[activity.length - 1]}` : ""}
         </span>
       </div>
@@ -362,7 +362,7 @@ export function AgentPanel() {
           }
         />
         <div className="v2-agent-actions">
-          <span className="mono v2-muted">⌘↵ · {budget > 0 ? `${budget - steps} steps left` : `${steps} steps`}</span>
+          <span className="mono v2-muted">⌘↵ · {budget > 0 ? `${budget - steps} ${budget - steps === 1 ? "step" : "steps"} left` : `${steps} ${steps === 1 ? "step" : "steps"}`}</span>
           {status === "thinking" ? (
             <button className="v2-agent-stop" onClick={stopAgent}>
               Stop

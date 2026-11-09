@@ -81,6 +81,7 @@ Open `http://localhost:3000/` for the landing page and `/studio` for the assembl
 | `SERPER_API_KEY` | — | optional Serper key for general web research |
 | `WEB_SEARCH_PROVIDER` | — | preferred research provider; falls back to DDG/Wikipedia without a key |
 | `CADGO_AGENT_MAX_TOKENS` | `24000` | agent output cap |
+| `CADGO_AGENT_REASONING_EFFORT` | — | optional provider reasoning effort: `low`, `medium` or `high` |
 | `CADGO_AGENT_RATE_LIMIT` | `0` | optional per-session request limit; `0` disables |
 | `CADGO_AGENT_RATE_WINDOW_MS` | `3600000` | rate-limit window |
 | `CADGO_AGENT_IP_RATE_LIMIT` | `0` | optional per-IP request limit; `0` disables |
