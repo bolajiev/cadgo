@@ -2,148 +2,184 @@
 
 **Describe a part or scene. Get editable 3D.**
 
-Cadgo is a browser-based AI 3D assembly studio for mechanical assemblies and concept 3D scenes. A plain-language brief becomes a parametric assembly graph — reusable OpenSCAD definitions, placed instances, groups, joints and drivers. Every part compiles locally with the OpenSCAD WebAssembly kernel, and you can edit a part’s dimensions, source or placement while the agent works on another; material overrides are set through the agent or the source.
+Cadgo is a browser-based AI 3D assembly studio for mechanical parts, mechanisms and concept scenes. A plain-language brief becomes a parametric assembly graph: reusable OpenSCAD definitions, placed instances, groups, joints and drivers. Every part compiles locally in the browser, and every dimension stays editable.
 
-CAD-grade parametric editing stays the core: named dimensions, editable source, separate bodies and standard exports.
+[Live studio](https://cadgo-3d.vercel.app/studio) · [Landing page](https://cadgo-3d.vercel.app/) · [50-second demo](docs/flexstand-demo-60s.mp4) · [Repository](https://github.com/bolajiev/cadgo)
 
-**Live studio:** https://cadgo-3d.vercel.app/studio  
-**Landing page:** https://cadgo-3d.vercel.app/  
-**Repository:** https://github.com/bolajiev/cadgo  
-**Hackathon:** Victoria VR AI Builder Hackathon 2026 · **AI-assisted 3D editing**
+[![Cadgo assembly studio](docs/studio.png)](https://cadgo-3d.vercel.app/studio)
 
-![Cadgo mounting plate in the assembly studio](docs/studio.png)
+## Demo
 
-![The lighthouse concept scene with a driven beacon](docs/lighthouse.png)
+[Watch the 50-second FlexStand build](docs/flexstand-demo-60s.mp4) — a real agent build, speed-ramped and edited for time. It covers the build, refinement, editable parameters, print check and driver showcase. The physical print is still pending and is labelled as such.
 
-## What it does
+Earlier humanoid backup: [`docs/cadgo-demo.mp4`](docs/cadgo-demo.mp4).
 
-- **Prompt → parametric assembly.** The agent writes OpenSCAD, the browser compiles it locally, and the dimensions appear as editable parameters. The same graph holds mechanical parts and concept scenes.
-- **One scope, two modes.** Mechanical assemblies and concept 3D scenes share groups, definitions, instances, joints and drivers. A bracket, a mechanism study and a concept scene use the same document model; there is no separate scene fork.
-- **Edit while the agent works.** The tree, stage and inspector stay live during an agent run. Select a part, change a dimension, move it, hide it, lock it, or edit its source. Every change is an immutable command with undo/redo.
-- **Demo.** [FlexStand 50-second demo](docs/flexstand-demo-60s.mp4) — agent-built phone stand, fast-cut screen demo. The physical print is still pending. The earlier humanoid cut is retained at `docs/cadgo-demo.mp4`.
-- **Streaming, readable agent chat.** Replies stream token by token and render Markdown: bold, lists, inline code and fenced OpenSCAD blocks. If the model hits its output limit, the agent automatically continues in smaller steps instead of stopping. For humanoids, it models a mechanical robot with limb groups and joints, not a person.
-- **Assembly tree.** Groups, definitions, instances, visibility, locking, suppression and transforms. Select in the tree or in 3D.
-- **Real CAD interaction.** Orthographic view, standard views, axis gizmo, overall dimension lines, translate/rotate gizmo, isolate, and a per-part property inspector. A presentation-lighting toggle switches to a warm light view with soft shadows and a clean grid for screenshots; the drafting dark view is the default.
-- **Per-part revisions and conflicts.** Every agent mutation carries the revision it read. If you changed the same part first, your edit wins and the agent receives a conflict to re-read and rebase.
-- **Per-instance overrides.** Change a parameter on one placed instance and it compiles a separate variant; the shared definition stays untouched.
-- **Material editing.** Source-colour and material-override modes, with colour, metalness, roughness and opacity per definition or instance.
-- **Local compile pool.** Two OpenSCAD WASM workers compile definitions in parallel; variants are cached by source + parameter hash. Failed parts keep the last good mesh and expose the compiler log.
-- **Image and print setup.** Attach up to three reference views; open **Print check → Edit print setup** to set purpose, printer, bed, material, supports and the overhang warning limit. The print profile gates STL export and drives the print check.
-- **Inspection.** The agent requests orthographic views; the browser renders the assembly and returns it to the model as vision evidence.
-- **Guarded web research.** The agent can verify standards, fastener dimensions, printer build volumes, material properties, vendor compatibility, regulations and real-product dimensions. Results are server-fetched with SSRF, redirect, port, content-size and content-type guards; pages are treated as untrusted evidence and sources are shown in the transcript.
-- **Motion.** Joints and drivers are the working logic for mechanisms and scenes: expression-driven revolute/prismatic/link joints, with a whole group as the joint target so a rotor or fan spins intact without separating its blades. Select a part or group and play its driver in the inspector, or double-click a moving part in the stage. Concept labs include a V8 and a transparent rotary mechanism.
-- **Print check.** Real compiled-mesh checks: watertightness, overhang percentage against a configurable limit, bed fit, solid volume and a material-density mass estimate. The same report gates STL export. Wall thickness and slicer time are not measured.
-- **Export and import.** Exports are assembly STL, a Scene GLB with the group hierarchy, resolved materials, driver animation clips and options for samples, duration and static export, a Part STLs ZIP (one transformed STL per visible instance plus the merged assembly), a ZIP with one editable SCAD per definition plus the assembly manifest and native document, `.cadgo.json`, and compressed share links. Import `.scad` as a new part or `.cadgo.json` to restore a complete assembly.
-- **Benchbook.** A mounting plate, honeycomb angle bracket, knurled knob, spur gear, project box cover, pipe adapter, furniture foot and desk cable clip, all fully parametric. Concept labs add a driven wind turbine, a lighthouse scene, the V8, a transparent rotary mechanism and a phase-driven humanoid walk cycle.
+## Why Cadgo
 
-![The assembly tree and property inspector](docs/studio-panel.png)
+Most AI 3D tools stop at a pretty mesh. Cadgo keeps the model editable:
+
+- **Real parametric geometry** — the agent writes OpenSCAD source with named top-level dimensions, not a one-off voxel or image.
+- **Local compilation** — OpenSCAD WebAssembly runs in browser workers. The server proxies the AI and research; it never executes geometry.
+- **One assembly graph** — parts, instances, groups, transforms, joints and drivers share the same document model for mechanical assemblies and concept scenes.
+- **Edit while the agent works** — select a part, change a dimension, move it, hide it or edit its source while the agent continues. Revisions prevent silent conflicts.
+- **Standard outputs** — STL, Part STLs, Scene GLB with driver clips, editable SCAD, `.cadgo.json` and share links.
+
+## Features
+
+### Agent and modelling
+- DeepSeek V4.1 Flash agent with tool calling, optional reference images and inspection renders.
+- Creates and edits definitions, instances, groups, joints and drivers.
+- Writes editable OpenSCAD source with named parameters and keeps dimensions in the inspector.
+- Compiles, inspects orthographic views and corrects compile or geometry errors.
+- Optional guarded web research for standards, fasteners, printer volumes and material data, with sources shown in the transcript.
+
+### Studio
+- Three.js / React Three Fiber stage with orthographic views, dimension lines, axis gizmo and presentation lighting.
+- Assembly tree, property inspector, transform gizmo, isolate, visibility, locking and suppression.
+- Per-instance parameter overrides and material overrides without changing the shared definition.
+- Per-node revisions, immutable commands, undo/redo and agent/user conflict handling.
+- Driver animations for rotors, beacons, V8 studies and other mechanism concepts.
+
+### Print and export
+- Print check for watertightness, overhang, bed fit, solid volume and material-mass estimate.
+- Configurable printer, bed, material, supports and overhang warning limit.
+- Assembly STL, one STL per visible instance, Scene GLB with animation clips, SCAD bundle, `.cadgo.json` and compressed share links.
+- Import `.scad` as a new part or `.cadgo.json` to restore an assembly.
+- Autosave to IndexedDB; optional Blob or local storage for large share links.
+
+### Benchbook and labs
+- Fully parametric mounting plate, honeycomb bracket, knurled knob, spur gear, project box cover, pipe adapter, furniture foot and desk cable clip.
+- Concept labs: driven wind turbine, lighthouse scene, V8, transparent rotary mechanism and phase-driven humanoid walk cycle.
 
 ## How it works
 
-```
-prompt / image / print setup ──► DeepSeek V4.1 Flash agent
-                                  │
-                 create/update definition, instance, group, joint
-                                  ▼
-                        immutable assembly document
-                                  │
-                                  ▼
-              per-definition OpenSCAD WASM compile
-              (worker pool · hash cache · metrics)
-                                  │
-                                  ▼
-       three.js assembly · selection · motion · inspection
-                                  │
-                                  ▼
-       STL · Scene GLB · Part STLs ZIP · SCAD + manifest ZIP · .cadgo.json · share
+```text
+prompt / image / print setup
+            │
+            ▼
+DeepSeek V4.1 Flash agent
+  tools: create/update definition, place instance, group,
+         joint, driver, compile, inspect, research
+            │
+            ▼
+immutable assembly document  ──►  IndexedDB autosave
+            │
+            ▼
+OpenSCAD WASM compile pool
+  browser workers · source + parameter hash cache
+            │
+            ▼
+three.js stage · tree · inspector · motion · print check
+            │
+            ▼
+STL · Scene GLB · Part STLs · SCAD · .cadgo.json · share
 ```
 
-The server is a model proxy. It never executes geometry. OpenSCAD runs in a browser module worker; the document autosaves to IndexedDB and exports explicitly. The only server-side document path is the optional large-share store, which holds a compressed share payload, not geometry.
+The server is a model proxy. It never executes geometry. OpenSCAD runs in the browser.
 
-## Run locally
+## Tech stack
+
+| Layer | Used |
+|---|---|
+| App | Next.js 16, React 19, TypeScript 5.9 |
+| 3D | three.js 0.186, React Three Fiber 9, Drei 10 |
+| CAD | OpenSCAD 2025.03.25 WASM, Manifold 3.5.4 |
+| AI | DeepSeek V4.1 Flash via OpenCode Go (OpenAI-compatible API); no model fallback |
+| State/data | Zustand, Zod, IndexedDB, lz-string, fflate, jsonrepair |
+| Hosting | Vercel; optional Vercel Blob and Upstash |
+| Testing | Vitest, Playwright |
+| Demo media | screen recording; locally generated music; guide voice via edge-tts / Microsoft neural TTS |
+
+## Getting started
+
+Requirements: Node.js 20.10+.
 
 ```sh
 npm install
 cp .env.example .env.local
-# add OPENCODE_GO_API_KEY
+# add OPENCODE_GO_API_KEY to .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000/` for the landing page and `/studio` for the assembly studio.
+- Landing page: `http://localhost:3000/`
+- Studio: `http://localhost:3000/studio`
 
-| variable | default | purpose |
+## Configuration
+
+| Variable | Default | Purpose |
 |---|---|---|
-| `OPENCODE_GO_API_KEY` | — | server-side key; never sent to the browser |
+| `OPENCODE_GO_API_KEY` | — | Server-side AI key; never sent to the browser |
 | `OPENCODE_GO_BASE_URL` | `https://opencode.ai/zen/go/v1` | OpenAI-compatible endpoint |
-| `OPENCODE_GO_DESIGN_MODEL` | `deepseek-v4.1-flash` | agent and vision model |
-| `BRAVE_SEARCH_API_KEY` | — | optional Brave Search key for general web research |
-| `TAVILY_API_KEY` | — | optional Tavily key for general web research |
-| `SERPER_API_KEY` | — | optional Serper key for general web research |
-| `WEB_SEARCH_PROVIDER` | — | preferred research provider; falls back to DDG/Wikipedia without a key |
-| `CADGO_AGENT_MAX_TOKENS` | `24000` | agent output cap |
-| `CADGO_AGENT_REASONING_EFFORT` | — | optional provider reasoning effort: `low`, `medium` or `high` |
-| `CADGO_AGENT_RATE_LIMIT` | `0` | optional per-session request limit; `0` disables |
-| `CADGO_AGENT_RATE_WINDOW_MS` | `3600000` | rate-limit window |
-| `CADGO_AGENT_IP_RATE_LIMIT` | `0` | optional per-IP request limit; `0` disables |
-| `UPSTASH_REDIS_REST_URL` | — | optional durable rate-limit store; Vercel KV's `KV_REST_API_URL` also works |
-| `UPSTASH_REDIS_REST_TOKEN` | — | token for the durable rate-limit store; Vercel KV's `KV_REST_API_TOKEN` also works |
-| `BLOB_READ_WRITE_TOKEN` | — | optional large-share storage |
-| `CADGO_SHARE_DIR` | `.data/shares` | local large-share directory outside Vercel |
-| `CADGO_SHARE_TTL_DAYS` | `30` | large-share expiry |
+| `OPENCODE_GO_DESIGN_MODEL` | `deepseek-v4.1-flash` | Agent and vision model |
+| `BRAVE_SEARCH_API_KEY` | — | Optional Brave Search key |
+| `TAVILY_API_KEY` | — | Optional Tavily key |
+| `SERPER_API_KEY` | — | Optional Serper key |
+| `WEB_SEARCH_PROVIDER` | — | Preferred research provider |
+| `CADGO_AGENT_MAX_TOKENS` | `24000` | Agent output cap |
+| `CADGO_AGENT_REASONING_EFFORT` | — | Optional `low`, `medium` or `high` |
+| `CADGO_AGENT_RATE_LIMIT` | `0` | Optional per-session request limit; `0` disables |
+| `CADGO_AGENT_RATE_WINDOW_MS` | `3600000` | Rate-limit window |
+| `CADGO_AGENT_IP_RATE_LIMIT` | `0` | Optional per-IP request limit; `0` disables |
+| `UPSTASH_REDIS_REST_URL` | — | Optional durable rate-limit store |
+| `UPSTASH_REDIS_REST_TOKEN` | — | Optional durable rate-limit token |
+| `BLOB_READ_WRITE_TOKEN` | — | Optional large-share storage |
+| `CADGO_SHARE_DIR` | `.data/shares` | Local large-share directory |
+| `CADGO_SHARE_TTL_DAYS` | `30` | Large-share expiry |
 
-Both agent rate limits are optional and default to `0` (disabled). If you enable them, `CADGO_AGENT_RATE_LIMIT` applies per agent session and `CADGO_AGENT_IP_RATE_LIMIT` applies per IP. Without `UPSTASH_REDIS_REST_URL` the limiter is in-process (fine for local use and one instance); a multi-instance deployment should set the durable store.
+Without a durable rate-limit store, limits are in-process and suitable for local or single-instance use. Agent rate limits default to disabled.
 
-### Checks
+## Scripts
 
 ```sh
-npm test                 # document, compile, audit, motion and bundle tests
-npm run test:e2e         # build + Playwright smoke and stage snapshot on :3100
-npm run typecheck
-npm run build
+npm run dev          # development server
+npm run build        # production build
+npm run start        # production server
+npm run typecheck    # TypeScript
+npm test             # Vitest
+npm run test:e2e     # build + Playwright
 ```
 
-## Try this
+## Repository layout
 
-1. Open `/studio`; choose **Benchbook → Mounting plate**.
-2. Click the part in the tree or stage; drag a **Part dimensions** slider and watch the local rebuild.
-3. Use the translate/rotate gizmo, isolate the part, and undo the edit.
-4. Open the **Agent** tab and ask: *“Add a 6 mm hole and make the plate 5 mm thick.”* Edit another part while it works.
-5. Attach reference views; open **Print check → Edit print setup** to set the profile; it gates STL export and the print check.
-6. Import a `.scad` as a new part, or import a previously exported `.cadgo.json`.
-7. Open **Export** for assembly STL, Scene GLB (with animation options), Part STLs, the SCAD ZIP bundle, the Cadgo document or a share link.
-8. Optional: **Benchbook → Concept labs** for the wind turbine, lighthouse scene, V8 and transparent rotary mechanism.
+```text
+app/          Next.js routes and API handlers
+components/   Studio, stage, inspector, agent chat and UI
+lib/          document model, compiler, agent tools, print checks, research
+public/       OpenSCAD/Manifold WASM, landing assets
+tests/        Vitest and Playwright tests
+docs/         screenshots, deployment notes, demo assets and attribution
+```
+
+## Screenshots
+
+| Studio | Concept scene |
+|---|---|
+| ![Assembly tree and inspector](docs/studio-panel.png) | ![Lighthouse scene](docs/lighthouse.png) |
 
 ## Limits
 
-- Concept CAD and concept 3D scenes, not certified engineering: no B-Rep, STEP, tolerances, mating constraints or manufacturing validation.
-- Concept scenes are for visualization and motion studies: no physics, gameplay, animation timeline or scene scripting.
-- The Scene GLB includes a clip per driver when drivers exist; it is a scene export, not a full animation timeline. A scene with no drivers exports static.
+Cadgo is a concept CAD and concept-scene tool, not certified engineering software.
+
+- No B-Rep, STEP, tolerances, mating constraints or manufacturing certification.
+- No physics, gameplay, animation timeline or scene scripting.
 - OpenSCAD is a mesh/CSG kernel; organic surfaces and tight fits are approximations.
-- The V8 and rotary studies are concept labs, not manufacturable engines.
-- Up to three reference views; no camera calibration, crop/rotate or photogrammetry.
-- No account or cloud project database. Documents autosave locally; an optional Blob/local store backs large share links.
-- Print check does not measure wall thickness or slicer time; those require a slicer or a B-Rep kernel. Mass assumes 100% infill.
-- Web research returns excerpts and sources, not certification. Verify critical dimensions against an authoritative source; sources can be wrong, incomplete or conflict.
+- Print check does not measure wall thickness or slicer time; mass assumes 100% infill.
+- Web research returns excerpts and sources, not certification.
+- The physical FlexStand print is still pending; the current demo does not claim a tested phone/cable fit.
 
-## Judging alignment
+## License and attribution
 
-- **Impact:** an editable starting point for hardware teams, makers, educators and creators building concept 3D scenes, with real source, named dimensions and standard exports.
-- **Generalizability:** any OpenSCAD source becomes a definition; the unified assembly graph, revision model, compile pool and agent tools are not tied to the benchbook. The same joints, drivers and material overrides work for mechanical assemblies and scenes, so the product is not limited to CAD demos.
-- **Technical depth:** local OpenSCAD WASM pool, per-variant hashing, progressive compile, immutable commands, per-node optimistic concurrency, explicit material overrides, expression-driven motion, inspection and export.
-- **Demo quality:** blank start, agent-assisted part or scene creation, live parameter/source editing, assembly tree, dimensions/gizmo, motion labs and one-click STL, Scene GLB, Part STLs, SCAD and JSON export.
+Cadgo is **GPL-3.0**. It distributes an OpenSCAD WebAssembly build (GPL-2.0-or-later), so the combined work is GPL-3.0.
 
-## Built with
+- [LICENSE](LICENSE)
+- [Third-party notices](THIRD_PARTY.md)
+- [OpenSCAD source offer](public/openscad/SOURCE-OFFER.txt)
+- [Deployment guide](docs/deployment.md)
 
-Next.js 16, React 19, React Three Fiber, three.js, OpenSCAD WebAssembly, Zustand, Zod, Vitest, Playwright, Vercel. The design engine uses an OpenAI-compatible endpoint (DeepSeek V4.1 Flash via OpenCode Go).
-
-The OpenSCAD WASM distribution and its source offer come from CADAM; see [THIRD_PARTY.md](THIRD_PARTY.md). The drafting visual system is informed by the Anatomy skill.
-
-## License
-
-**GPL-3.0.** The app distributes the OpenSCAD WebAssembly build, which is GPL-2.0-or-later; the combined distribution is GPL-3.0. See [LICENSE](LICENSE) and `public/openscad/SOURCE-OFFER.txt`.
+The design language is informed by the [Anatomy](https://github.com/wheresryan22/anatomy) skill (MIT). OpenSCAD WASM distribution comes from CADAM. Full asset and service terms are listed in `THIRD_PARTY.md`.
 
 ## Submission
 
 - [Written submission](SUBMISSION.md)
-- [Deployment](docs/deployment.md)
 - Category: **AI-assisted 3D editing**
+- Victoria VR AI Builder Hackathon 2026
