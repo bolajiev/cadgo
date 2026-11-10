@@ -14,6 +14,8 @@ Cadgo is distributed under **GPL-3.0** because it includes the OpenSCAD WebAssem
 | [Zustand](https://github.com/pmndrs/zustand) | MIT | state |
 | [Zod](https://zod.dev) | MIT | schema validation |
 | [jsonrepair](https://github.com/josdejong/jsonrepair) | ISC | tolerant JSON parsing |
+| [clsx](https://github.com/lukeed/clsx) | MIT | class-name utility |
+| [react-markdown](https://github.com/remarkjs/react-markdown) | MIT | Markdown rendering in chat |
 | [lz-string](https://github.com/pieroxy/lz-string) | MIT | share-link compression |
 | [idb-keyval](https://github.com/jakearchibald/idb-keyval) | Apache-2.0 | local recent projects |
 | [fflate](https://github.com/101arrowz/fflate) | MIT | SCAD ZIP bundle |
@@ -21,12 +23,15 @@ Cadgo is distributed under **GPL-3.0** because it includes the OpenSCAD WebAssem
 | [Vitest](https://vitest.dev) | MIT | unit/integration tests |
 | [@playwright/test](https://playwright.dev) | Apache-2.0 | browser E2E tests |
 | [Anatomy](https://github.com/wheresryan22/anatomy) | MIT | drafting/plate design language |
+| [edge-tts](https://github.com/rany2/edge-tts) | LGPL-3.0 | guide-voice generation for the demo video; not part of the app |
 
 The OpenSCAD WASM source offer is at `public/openscad/SOURCE-OFFER.txt`. The Manifold WASM binary is at `public/manifold.wasm`; its license is at https://github.com/elalish/manifold/blob/master/LICENSE.
 
 The design compiler uses an OpenAI-compatible endpoint (OpenCode Go). Model availability and terms are governed by that provider. No model weights are redistributed.
 
 All images in `public/examples`, `public/hero-lamp.png` and `docs/` are renders of Cadgo's own models.
+
+**Demo media.** The FlexStand demo is a screen recording of Cadgo. Its background music was synthesized locally (no third-party track). Its guide voice was generated with `edge-tts` against Microsoft Edge's online neural TTS; voice output is subject to Microsoft's applicable service terms. No third-party footage, 3D models, textures or datasets are used.
 
 ## Licensing compliance note
 
